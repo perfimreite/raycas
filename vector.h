@@ -20,7 +20,7 @@ i32 v2_square_len(V2 a);
 
 f32 v2_len(V2 a);
 
-V2 v2_scale(V2 a, i32 k);
+V2 v2_scale(V2 a, f32 k);
 
 V2 v2_unit(V2 a);
 

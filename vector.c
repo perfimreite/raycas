@@ -48,20 +48,19 @@ f32 v2_len(V2 a)
     return sqrt(v2_square_len(a));
 }
 
-V2 v2_scale(V2 a, i32 k)
+V2 v2_scale(V2 a, f32 k)
 {
-	return (V2){ .x = a.x*k, .y = a.y*k };
+	return (V2){ .x = (f32)a.x*k, .y = (f32)a.y*k };
 }
 
 V2 v2_unit(V2 a)
 {
 	assert(!v2_zero(a));
-	i32 unit = 50.f;
+	i32 unit = 50.0f;
 	// NOTE: we first divide by unit instead of scaling
 	// at the end in order to not lose precision
 	f32 l = v2_len(a) / unit;
-	V2 v = { .x = (f32)a.x / l, .y = (f32)a.y / l};
-	return v;
+	return v2_scale(a, 1.0f / l);
 }
 
 V2 v2_normal(V2 a)

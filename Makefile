@@ -1,3 +1,12 @@
-main: main.c
-	gcc -Wall -Wextra -std=c11 vector.c main.c -I/usr/include/SDL2 -L/usr/lib -lSDL2 -lSDL2main -lm -o build/main && build/main
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c11
+
+run: build/main
+	build/main
+
+build/main: main.c
+	$(CC) $(CFLAGS) vector.c main.c -I/usr/include/SDL2 -lSDL2 -lSDL2main -lSDL2_ttf -lm -o build/main -g
+
+clean:
+	rm -rf build/main
 
