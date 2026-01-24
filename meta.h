@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#ifndef META_H
+#define META_H
+
 /* === types === */
 typedef int8_t   i8;
 typedef int16_t  i16;
@@ -15,3 +18,5 @@ typedef double   f64;
 typedef size_t   size;
 
 // TODO: add TODO(), UNREACHABLE(), UNUSED()...
+
+#endif // META_H
