@@ -2,7 +2,7 @@
 
 Raycas is a game engine built using the raycasting rendering technique to create a 3D perspective in a 2D map.
 
-## sources
+## Sources
 
 - https://lodev.org/cgtutor/raycasting.html
 

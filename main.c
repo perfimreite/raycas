@@ -4,6 +4,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -72,8 +73,7 @@ void init_font(Font *font, i32 height, const char *path)
 typedef enum {
     Debug_Overlay_Hidden,
     Debug_Overlay_Shown,
-    Debug_Overlay_Advanced,
-    Debug_Overlay_Count,
+    Debug_Overlay_Advanced
 } Overlay_State;
 
 typedef struct {
@@ -190,6 +190,13 @@ void draw_intersect(SDL_Color color, V2 a, V2 b)
     }
 }
 
+u64 time_ms(void)
+{
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    return (u64)ts.tv_sec * 1e3 + (u64)ts.tv_nsec / 1e6;
+}
+
 i32 main(void)
 {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
@@ -213,17 +220,17 @@ i32 main(void)
         printf("ERROR: could not initialize ttf\n");
         return 1;
     }
+
+    time_t begin = time_ms();
+    i32 elapsed_time;
+    i32 prev_elapsed_time = 0;
+    u64 frames = 0;
     
     Font font = { 0 };
     init_font(&font, 24, "fonts/CascadiaMono.ttf");
 
     Debug_Overlay overlay = { .state = Debug_Overlay_Hidden };
-    sprintf(overlay.msg, "RES:%dx%d", WINDOW_WIDTH, WINDOW_HEIGHT); 
-
-    SDL_Surface *surface = TTF_RenderText_Shaded(font.font, overlay.msg, black, black_trans);
-    SDL_Texture *texture = SDL_CreateTextureFromSurface(r, surface);
-    SDL_Rect     rect    = { .x = 10, .y = 10, .w = font.width * strlen(overlay.msg), .h = font.height};
-    SDL_FreeSurface(surface);
+    sprintf(overlay.msg, "RES:%dx%d, FPS: %d", WINDOW_WIDTH, WINDOW_HEIGHT, 0);
 
     SDL_Event event;
     State state = { 0 };
@@ -236,8 +243,13 @@ i32 main(void)
             switch (event.type) {
                 case SDL_QUIT: state.quit = true; break;
                 case SDL_KEYDOWN: {
-                    if      (event.key.keysym.sym == SDLK_ESCAPE) state.quit = true;
-                    else if (event.key.keysym.sym == SDLK_o)      overlay.state += 1;
+                    if      (event.key.keysym.sym == SDLK_ESCAPE) {
+                        state.quit = true;
+                    }
+                    else if (event.key.keysym.sym == SDLK_o) {
+                        // 3 is amount of overlays
+                        overlay.state = (overlay.state + 1) % 3;
+                    }
                     break;
                 }
             }
@@ -277,17 +289,36 @@ i32 main(void)
         draw_line(red, player.pos, v2_add(camera.center, camera.a), 1);
         draw_line(red, player.pos, v2_add(camera.center, camera.b), 1);
         
-        switch (overlay.state % Debug_Overlay_Count) {
+        // updates every frame, this has to be dogshit
+        SDL_Surface *surface = TTF_RenderText_Shaded(font.font, overlay.msg, black, black_trans);
+        SDL_Texture *texture = SDL_CreateTextureFromSurface(r, surface);
+        SDL_Rect     rect    = { .x = 10, .y = 10, .w = font.width * strlen(overlay.msg), .h = font.height};
+        SDL_FreeSurface(surface);
+        
+        switch (overlay.state) {
             case Debug_Overlay_Hidden:   break;
             case Debug_Overlay_Shown:    SDL_RenderCopy(r, texture, NULL, &rect); break;
             case Debug_Overlay_Advanced: break;
+        }
+        
+        frames += 1;
+        time_t now = time_ms();
+        elapsed_time = now - begin;
+        
+        // updates every 100ms
+        if (elapsed_time > prev_elapsed_time + 100) {
+            u64 fps = frames / (elapsed_time * 1e-3);
+            sprintf(overlay.msg, "RES:%dx%d, FPS: %ld", WINDOW_WIDTH, WINDOW_HEIGHT, fps); 
+
+            // frames = 0;
+            prev_elapsed_time = elapsed_time;
         }
 
         // draw to window
         SDL_RenderPresent(r);
     }
 
-    SDL_DestroyTexture(texture);
+    // SDL_DestroyTexture(texture);
 
     return 0;
 }
