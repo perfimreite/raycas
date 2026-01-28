@@ -71,7 +71,10 @@ V2f v2f_scale(V2f a, f32 k)
 
 V2f v2f_unit(V2 a)
 {
-	assert(!v2_zero(a));
+	// assert(!v2_zero(a));
+
+    if (v2_zero(a)) return v2_to_v2f(a);
+
 	f32 l = v2_len(a);
 	return v2f_scale(v2_to_v2f(a), 1.0f / l);
 }
