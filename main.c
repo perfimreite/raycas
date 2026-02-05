@@ -26,8 +26,8 @@ static SDL_Window *w = NULL;
 static SDL_Renderer *r = NULL;
 
 // map
-#define EMPTY  0
-#define WALL   1
+#define EMPTY 0
+#define WALL  1
 
 static i32 map[ROWS][COLS] = {
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
@@ -73,13 +73,14 @@ void init_font(Font *font, i32 height, const char *path)
 typedef enum {
     Debug_Overlay_Hidden,
     Debug_Overlay_Shown,
-    Debug_Overlay_Advanced
+    // Debug_Overlay_Advanced
 } Overlay_State;
 
 typedef struct {
     Overlay_State state;
     char msg[1024];
-    char advanced[1024];
+    const char *msg_format;
+    // char advanced[1024];
 } Debug_Overlay;
 
 typedef struct {
@@ -129,7 +130,7 @@ void draw_line(SDL_Color color, V2 a, V2 b, i32 padding)
 {
     set_draw_color(color);
 
-    for (i32 i = -1*padding; i <= padding; i++) {
+    for (i32 i = -padding; i <= padding; i++) {
         if (SDL_RenderDrawLine(r, a.x + i, a.y + i, b.x + i, b.y + i) != 0) exit(1);
     }
 }
@@ -156,7 +157,7 @@ void draw_circle(SDL_Color color, V2 a, i32 radius)
             i32 l =  v2_square_len(v2_sub(u, a));
 
             if (radius_sq - acc <= l && l <= radius_sq + acc) {
-                draw_line(color, (V2){ .x = x, .y = y }, (V2){ .x = a.x, .y = a.y }, 0);
+                draw_line(color, a, u, 0);
             }
         }
     }
@@ -170,7 +171,7 @@ void draw_intersect(SDL_Color color, V2 a, V2 b)
     f32 l = v2_len(u);
 
     for (i32 i = 0; i < l; i++) {
-        f32 t = i/l;
+        f32 t = i / l;
         i32 x = a.x + t * u.x;
         i32 y = a.y + t * u.y;
 
@@ -190,11 +191,11 @@ void draw_intersect(SDL_Color color, V2 a, V2 b)
     }
 }
 
-u64 time_ms(void)
+f64 time_in_seconds(void)
 {
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);
-    return (u64)ts.tv_sec * 1e3 + (u64)ts.tv_nsec / 1e6;
+    return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
 i32 main(void)
@@ -221,16 +222,14 @@ i32 main(void)
         return 1;
     }
 
-    time_t begin = time_ms();
-    i32 elapsed_time;
+    time_t begin = time_in_seconds();
     i32 prev_elapsed_time = 0;
     u64 frames = 0;
     
     Font font = { 0 };
     init_font(&font, 24, "fonts/CascadiaMono.ttf");
 
-    Debug_Overlay overlay = { .state = Debug_Overlay_Hidden };
-    sprintf(overlay.msg, "RES:%dx%d, FPS: %d", WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+    Debug_Overlay overlay = { .state = Debug_Overlay_Hidden, .msg_format = "RES:%dx%d, FPS: %d" };
 
     SDL_Event event;
     State state = { 0 };
@@ -248,7 +247,7 @@ i32 main(void)
                     }
                     else if (event.key.keysym.sym == SDLK_o) {
                         // 3 is amount of overlays
-                        overlay.state = (overlay.state + 1) % 3;
+                        overlay.state = (overlay.state + 1) % 2;
                     }
                     break;
                 }
@@ -292,30 +291,32 @@ i32 main(void)
         // updates every frame, this has to be dogshit
         SDL_Surface *surface = TTF_RenderText_Shaded(font.font, overlay.msg, black, black_trans);
         SDL_Texture *texture = SDL_CreateTextureFromSurface(r, surface);
-        SDL_Rect     rect    = { .x = 10, .y = 10, .w = font.width * strlen(overlay.msg), .h = font.height};
+        SDL_Rect rect = { .x = 10, .y = 10, .w = font.width * strlen(overlay.msg), .h = font.height };
         SDL_FreeSurface(surface);
         
         switch (overlay.state) {
             case Debug_Overlay_Hidden:   break;
             case Debug_Overlay_Shown:    SDL_RenderCopy(r, texture, NULL, &rect); break;
-            case Debug_Overlay_Advanced: break;
+            // case Debug_Overlay_Advanced: break;
         }
         
-        frames += 1;
-        time_t now = time_ms();
-        elapsed_time = now - begin;
-        
-        // updates every 100ms
-        if (elapsed_time > prev_elapsed_time + 100) {
-            u64 fps = frames / (elapsed_time * 1e-3);
-            sprintf(overlay.msg, "RES:%dx%d, FPS: %ld", WINDOW_WIDTH, WINDOW_HEIGHT, fps); 
+        time_t now = time_in_seconds();
+        f64 elapsed_time = now - begin;
 
-            // frames = 0;
+        // updates every 10ms
+        if (elapsed_time > prev_elapsed_time + 0.01f) {
+            f64 dt = elapsed_time - prev_elapsed_time;
+            u64 fps = (f64)frames / dt;
+            sprintf(overlay.msg, overlay.msg_format, WINDOW_WIDTH, WINDOW_HEIGHT, fps); 
+
+            frames = 0;
             prev_elapsed_time = elapsed_time;
         }
 
         // draw to window
         SDL_RenderPresent(r);
+        
+        frames += 1;
     }
 
     // SDL_DestroyTexture(texture);

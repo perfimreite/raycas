@@ -26,12 +26,12 @@ V2 v2_sub(V2 a, V2 b)
 
 V2 v2_mul(V2 a, V2 b)
 {
-	return (V2){ .x = a.x*b.x, .y = a.y*b.y };
+	return (V2){ .x = a.x * b.x, .y = a.y * b.y };
 }
 
 V2 v2_div(V2 a, V2 b)
 {
-	return (V2){ .x = a.x/b.x, .y = a.y/b.y };
+	return (V2){ .x = a.x / b.x, .y = a.y / b.y };
 }
 
 V2 v2_cell(V2 a)
@@ -41,7 +41,7 @@ V2 v2_cell(V2 a)
 
 V2 v2_normal(V2 a)
 {
-	return (V2){ .x = -1*a.y, .y = a.x };
+	return (V2){ .x = -a.y, .y = a.x };
 }
 
 V2  v2_scale(V2 a, i32 k)
@@ -56,7 +56,7 @@ bool v2_zero(V2 a)
 
 i32 v2_square_len(V2 a)
 {
-    return a.x*a.x + a.y*a.y;
+    return a.x * a.x + a.y * a.y;
 }
 
 f32 v2_len(V2 a)
