@@ -13,6 +13,8 @@ typedef struct {
 	f32 y;
 } V2f;
 
+extern V2 zero_vector;
+
 V2  v2_add(V2 a, V2 b);
 V2  v2_sub(V2 a, V2 b);
 V2  v2_mul(V2 a, V2 b);

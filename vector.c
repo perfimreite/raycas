@@ -7,7 +7,8 @@
 #include <assert.h>
 #include <stdbool.h>
 
-static const V2 zero_vector = { .x = 0, .y = 0 };
+V2 zero_vector = { .x = 0, .y = 0 };
+
 
 bool v2_eq(V2 a, V2 b)
 {

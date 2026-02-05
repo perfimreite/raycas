@@ -19,6 +19,7 @@ static const SDL_Color gray        = { .r = 127, .g = 127, .b = 127, .a = 255 };
 static const SDL_Color red         = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
 static const SDL_Color green       = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
 static const SDL_Color blue        = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
+static const SDL_Color purple      = { .r = 255, .g = 0  , .b = 255, .a = 255 };
 
 static const SDL_Color black_trans = { .r = 0  , .g = 0  , .b = 0  , .a = 31 };
 
@@ -96,6 +97,9 @@ typedef struct {
     V2 a;
     V2 b;
 
+    V2 a_intersect;
+    V2 b_intersect;
+
     i32 radius;
 } Camera;
 
@@ -163,21 +167,20 @@ void draw_circle(SDL_Color color, V2 a, i32 radius)
     }
 }
 
-void draw_intersect(SDL_Color color, V2 a, V2 b)
+V2 find_intersect(V2 a, V2 b)
 {
-    set_draw_color(color);
-
     V2 u = v2_sub(b, a);
     f32 l = v2_len(u);
 
-    for (i32 i = 0; i < l; i++) {
+    for (i32 i = 0;; i++) {
         f32 t = i / l;
         i32 x = a.x + t * u.x;
         i32 y = a.y + t * u.y;
+            
+        V2 intersect = { .x = x, .y = y };
 
         // check for oob
-        if ((0 > x || x > WINDOW_WIDTH) || (0 > y || y> WINDOW_HEIGHT)) return;
-
+        if ((0 > x || x > WINDOW_WIDTH) || (0 > y || y > WINDOW_HEIGHT)) return intersect;
         i32 pos = map_square(x, y);
 
         if (
@@ -185,10 +188,15 @@ void draw_intersect(SDL_Color color, V2 a, V2 b)
             (y % CELL_SIZE == 0 && (pos == WALL || (u.y < 0 && map_square(x, y - 1) == WALL)))
            ) {
             V2 intersect = { .x = x, .y = y };
-            draw_circle(color, intersect, 6);
-            return;
+            return intersect;
         }
     }
+}
+
+void draw_intersect(SDL_Color color, V2 a, V2 b)
+{
+    V2 intersect = find_intersect(a, b);
+    draw_circle(color, intersect, 6);
 }
 
 f64 time_in_seconds(void)
@@ -222,10 +230,6 @@ i32 main(void)
         return 1;
     }
 
-    time_t begin = time_in_seconds();
-    i32 prev_elapsed_time = 0;
-    u64 frames = 0;
-    
     Font font = { 0 };
     init_font(&font, 24, "fonts/CascadiaMono.ttf");
 
@@ -238,6 +242,8 @@ i32 main(void)
     const u8 *keystate = SDL_GetKeyboardState(NULL);
 
     while (!state.quit) {
+        f64 begin = time_in_seconds();
+    
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
                 case SDL_QUIT: state.quit = true; break;
@@ -266,12 +272,16 @@ i32 main(void)
 
         // compute camera coordinates
         camera.center = v2_add(player.pos, player.dir);
-        camera.a = v2_normal(player.dir);
-        camera.b = v2_scale(v2_normal(player.dir), -1);
+        camera.a = v2_add(camera.center, v2_normal(player.dir));
+        camera.b = v2_add(camera.center, v2_scale(v2_normal(player.dir), -1));
+
+        camera.a_intersect = find_intersect(camera.a, v2_add(camera.a, v2_scale(v2_sub(camera.a, player.pos), 16)));
+        camera.b_intersect = find_intersect(camera.b, v2_add(camera.b, v2_scale(v2_sub(camera.b, player.pos), 16)));
 
         set_draw_color(white);
         SDL_RenderClear(r);
 
+// #if 0
         draw_walls(gray);
         draw_grid(black);
 
@@ -284,39 +294,33 @@ i32 main(void)
         // draw camera
         draw_circle(black, camera.center, camera.radius);
         draw_line(black, player.pos, camera.center, 1);
-        draw_line(blue, v2_add(camera.center, camera.a), v2_add(camera.center, camera.b), 1);
-        draw_line(red, player.pos, v2_add(camera.center, camera.a), 1);
-        draw_line(red, player.pos, v2_add(camera.center, camera.b), 1);
+        draw_line(blue, camera.a, camera.b, 1);
+        draw_line(red, player.pos, camera.a, 1);
+        draw_line(red, player.pos, camera.b, 1);
         
+        draw_line(purple, camera.a, camera.a_intersect, 1);
+        draw_line(purple, camera.b, camera.b_intersect, 1);
+// #endif
+
         // updates every frame, this has to be dogshit
         SDL_Surface *surface = TTF_RenderText_Shaded(font.font, overlay.msg, black, black_trans);
         SDL_Texture *texture = SDL_CreateTextureFromSurface(r, surface);
         SDL_Rect rect = { .x = 10, .y = 10, .w = font.width * strlen(overlay.msg), .h = font.height };
         SDL_FreeSurface(surface);
-        
+
         switch (overlay.state) {
             case Debug_Overlay_Hidden:   break;
             case Debug_Overlay_Shown:    SDL_RenderCopy(r, texture, NULL, &rect); break;
             // case Debug_Overlay_Advanced: break;
         }
         
-        time_t now = time_in_seconds();
-        f64 elapsed_time = now - begin;
-
-        // updates every 10ms
-        if (elapsed_time > prev_elapsed_time + 0.01f) {
-            f64 dt = elapsed_time - prev_elapsed_time;
-            u64 fps = (f64)frames / dt;
-            sprintf(overlay.msg, overlay.msg_format, WINDOW_WIDTH, WINDOW_HEIGHT, fps); 
-
-            frames = 0;
-            prev_elapsed_time = elapsed_time;
-        }
+        f64 now = time_in_seconds();
+        f64 dt = now - begin;
+        u64 fps = 1 / dt;
+        sprintf(overlay.msg, overlay.msg_format, WINDOW_WIDTH, WINDOW_HEIGHT, fps); 
 
         // draw to window
         SDL_RenderPresent(r);
-        
-        frames += 1;
     }
 
     // SDL_DestroyTexture(texture);
