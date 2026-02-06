@@ -13,6 +13,7 @@
 #include <SDL2/SDL_render.h>
 #include <SDL2/SDL_ttf.h>
 
+// none transparent colors
 static const SDL_Color black       = { .r = 0  , .g = 0  , .b = 0  , .a = 255 };
 static const SDL_Color white       = { .r = 255, .g = 255, .b = 255, .a = 255 };
 static const SDL_Color gray        = { .r = 127, .g = 127, .b = 127, .a = 255 };
@@ -20,11 +21,14 @@ static const SDL_Color red         = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
 static const SDL_Color green       = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
 static const SDL_Color blue        = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
 static const SDL_Color purple      = { .r = 255, .g = 0  , .b = 255, .a = 255 };
+static const SDL_Color cyan        = { .r = 0  , .g = 255, .b = 255, .a = 255 };
 
+// transparent colors
 static const SDL_Color black_trans = { .r = 0  , .g = 0  , .b = 0  , .a = 31 };
 
 static SDL_Window *w = NULL;
 static SDL_Renderer *r = NULL;
+static SDL_Event event;
 
 // map
 #define EMPTY 0
@@ -72,17 +76,16 @@ void init_font(Font *font, i32 height, const char *path)
 }
 
 typedef enum {
-    Debug_Overlay_Hidden,
-    Debug_Overlay_Shown,
-    // Debug_Overlay_Advanced
+    OVERLAY_STATE_HIDDEN,
+    OVERLAY_STATE_SHOWN,
+    __overlay_state_count,
 } Overlay_State;
 
 typedef struct {
     Overlay_State state;
     char msg[1024];
     const char *msg_format;
-    // char advanced[1024];
-} Debug_Overlay;
+} Overlay;
 
 typedef struct {
     V2 pos;
@@ -176,7 +179,7 @@ V2 find_intersect(V2 a, V2 b)
         f32 t = i / l;
         i32 x = a.x + t * u.x;
         i32 y = a.y + t * u.y;
-            
+
         V2 intersect = { .x = x, .y = y };
 
         // check for oob
@@ -206,6 +209,18 @@ f64 time_in_seconds(void)
     return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
+void update_overlay_message(Overlay *overlay, f64 begin, f64 now)
+{
+    f64 dt = now - begin;
+    u64 fps = 1 / dt;
+    sprintf(overlay->msg, overlay->msg_format, WINDOW_WIDTH, WINDOW_HEIGHT, fps);
+}
+
+bool is_key_pressed(i32 key)
+{
+    return event.key.keysym.sym == key;
+}
+
 i32 main(void)
 {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
@@ -233,9 +248,8 @@ i32 main(void)
     Font font = { 0 };
     init_font(&font, 24, "fonts/CascadiaMono.ttf");
 
-    Debug_Overlay overlay = { .state = Debug_Overlay_Hidden, .msg_format = "RES:%dx%d, FPS: %d" };
+    Overlay overlay = { .state = OVERLAY_STATE_HIDDEN, .msg_format = "RESOLUTION: %dx%d, FPS: %d" };
 
-    SDL_Event event;
     State state = { 0 };
     Player player = { .pos.x = 200, .pos.y = 200, .color = blue, .velocity = 1.0f, .radius = 6};
     Camera camera = { .radius = 6 };
@@ -246,17 +260,17 @@ i32 main(void)
     
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
-                case SDL_QUIT: state.quit = true; break;
-                case SDL_KEYDOWN: {
-                    if      (event.key.keysym.sym == SDLK_ESCAPE) {
-                        state.quit = true;
-                    }
-                    else if (event.key.keysym.sym == SDLK_o) {
-                        // 3 is amount of overlays
-                        overlay.state = (overlay.state + 1) % 2;
-                    }
-                    break;
+            case SDL_QUIT:
+                state.quit = true;
+                break;
+            case SDL_KEYDOWN:
+                if (is_key_pressed(SDLK_ESCAPE)) {
+                    state.quit = true;
                 }
+                else if (is_key_pressed(SDLK_o)) {
+                    overlay.state = (overlay.state + 1) % __overlay_state_count;
+                }
+                break;
             }
         }
 
@@ -277,6 +291,8 @@ i32 main(void)
 
         camera.a_intersect = find_intersect(camera.a, v2_add(camera.a, v2_scale(v2_sub(camera.a, player.pos), 16)));
         camera.b_intersect = find_intersect(camera.b, v2_add(camera.b, v2_scale(v2_sub(camera.b, player.pos), 16)));
+
+        // V2 x = v2_add(v2_sub(camera.center, camera.a), v2f_to_v2(v2f_scale(v2f_unit(player.dir), v2_len(camera.a_intersect))));
 
         set_draw_color(white);
         SDL_RenderClear(r);
@@ -300,27 +316,27 @@ i32 main(void)
         
         draw_line(purple, camera.a, camera.a_intersect, 1);
         draw_line(purple, camera.b, camera.b_intersect, 1);
+        
+        // draw_line(cyan, camera.a, x, 1);
 // #endif
 
-        // updates every frame, this has to be dogshit
         SDL_Surface *surface = TTF_RenderText_Shaded(font.font, overlay.msg, black, black_trans);
         SDL_Texture *texture = SDL_CreateTextureFromSurface(r, surface);
-        SDL_Rect rect = { .x = 10, .y = 10, .w = font.width * strlen(overlay.msg), .h = font.height };
+        const SDL_Rect rect = {.x = 0, .y = 0, .w = font.width * strlen(overlay.msg), .h = font.height};
         SDL_FreeSurface(surface);
 
         switch (overlay.state) {
-            case Debug_Overlay_Hidden:   break;
-            case Debug_Overlay_Shown:    SDL_RenderCopy(r, texture, NULL, &rect); break;
-            // case Debug_Overlay_Advanced: break;
+        case OVERLAY_STATE_HIDDEN:  break;
+        case OVERLAY_STATE_SHOWN:   SDL_RenderCopy(r, texture, NULL, &rect); break;
+        case __overlay_state_count: break;
         }
-        
-        f64 now = time_in_seconds();
-        f64 dt = now - begin;
-        u64 fps = 1 / dt;
-        sprintf(overlay.msg, overlay.msg_format, WINDOW_WIDTH, WINDOW_HEIGHT, fps); 
 
         // draw to window
         SDL_RenderPresent(r);
+        
+        f64 now = time_in_seconds();
+
+        update_overlay_message(&overlay, begin, now);
     }
 
     // SDL_DestroyTexture(texture);
