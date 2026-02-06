@@ -17,6 +17,14 @@ typedef float    f32;
 typedef double   f64;
 typedef size_t   size;
 
-// TODO: add TODO(), UNREACHABLE(), UNUSED()...
+/* === descriptive alternatives for `static` === */
+#define internal      static
+#define global        static
+#define local_persist static
+
+/* === useful macros whilst implementing new code === */
+#define UNUSED(value) (void)(value)
+#define TODO(message) do { fprintf(stderr, "%s:%d: TODO: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
+#define UNREACHABLE(message) do { fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
 
 #endif // META_H
