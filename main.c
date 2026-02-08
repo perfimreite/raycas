@@ -14,27 +14,23 @@
 #include <SDL2/SDL_ttf.h>
 
 // none transparent colors
-static const SDL_Color black       = { .r = 0  , .g = 0  , .b = 0  , .a = 255 };
-static const SDL_Color white       = { .r = 255, .g = 255, .b = 255, .a = 255 };
-static const SDL_Color gray        = { .r = 127, .g = 127, .b = 127, .a = 255 };
-static const SDL_Color red         = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
-static const SDL_Color green       = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
-static const SDL_Color blue        = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
-static const SDL_Color purple      = { .r = 255, .g = 0  , .b = 255, .a = 255 };
-static const SDL_Color cyan        = { .r = 0  , .g = 255, .b = 255, .a = 255 };
+global const SDL_Color black       = { .r = 0  , .g = 0  , .b = 0  , .a = 255 };
+global const SDL_Color white       = { .r = 255, .g = 255, .b = 255, .a = 255 };
+global const SDL_Color gray        = { .r = 127, .g = 127, .b = 127, .a = 255 };
+global const SDL_Color red         = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
+global const SDL_Color green       = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
+global const SDL_Color blue        = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
+global const SDL_Color purple      = { .r = 255, .g = 0  , .b = 255, .a = 255 };
+global const SDL_Color cyan        = { .r = 0  , .g = 255, .b = 255, .a = 255 };
 
 // transparent colors
-static const SDL_Color black_trans = { .r = 0  , .g = 0  , .b = 0  , .a = 31 };
-
-static SDL_Window *w = NULL;
-static SDL_Renderer *r = NULL;
-static SDL_Event event;
+global const SDL_Color black_trans = { .r = 0  , .g = 0  , .b = 0  , .a = 31 };
 
 // map
 #define EMPTY 0
 #define WALL  1
 
-static i32 map[ROWS][COLS] = {
+global i32 map[ROWS][COLS] = {
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
     {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0},
@@ -49,9 +45,14 @@ static i32 map[ROWS][COLS] = {
     {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
 };
 
-i32 map_square(i32 x, i32 y)
+internal i32 get_map_square(i32 x, i32 y)
 {
     return map[y/CELL_SIZE][x/CELL_SIZE];
+}
+
+internal bool is_wall(i32 x, i32 y)
+{
+    return get_map_square(x, y) == WALL;
 }
 
 typedef struct {
@@ -62,11 +63,11 @@ typedef struct {
     TTF_Font *font;
 } Font;
 
-void init_font(Font *font, i32 height, const char *path)
+internal void init_font(Font *font, const char *path, i32 height)
 {
+    font->path = path;
     font->height = height;
     font->width = height / 2;
-    font->path = path;
 
     font->font = TTF_OpenFont(path, height);
     if (!font->font) {
@@ -107,42 +108,69 @@ typedef struct {
 } Camera;
 
 typedef struct {
-    bool quit;
-    V2 pos;
-} State;
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+    SDL_Event event;
 
-void set_draw_color(SDL_Color color)
+    bool quit;
+    V2 cursor;
+} Game;
+
+Game game = { 0 };
+
+internal void init_game(Game *game)
 {
-    if (SDL_SetRenderDrawColor(r, color.r, color.g, color.b, color.a) != 0) {
+    game->window = SDL_CreateWindow("Raycas",
+                                    SDL_WINDOWPOS_CENTERED,
+                                    SDL_WINDOWPOS_CENTERED,
+                                    WINDOW_WIDTH,
+                                    WINDOW_HEIGHT,
+                                    0);
+
+    if (!game->window) {
+        printf("ERROR: could not create window\n");
+        exit(1);
+    }
+
+    game->renderer = SDL_CreateRenderer(game->window, -1, 0);
+    if (!game->renderer) {
+        printf("ERROR: could not create renderer\n");
+        exit(1);
+    }
+}
+
+internal void set_draw_color(SDL_Color color)
+{
+    if (SDL_SetRenderDrawColor(game.renderer, color.r, color.g, color.b, color.a) != 0) {
         printf("ERROR: could not set render draw color\n");
         exit(1);
     }
 }
 
-void draw_walls(SDL_Color color)
+internal void draw_walls(SDL_Color color)
 {
     set_draw_color(color);
 
     for (u64 y = 0; y < WINDOW_HEIGHT; y += CELL_SIZE) {
         for (u64 x = 0; x < WINDOW_WIDTH; x += CELL_SIZE) {
-            if (map_square(x, y) == WALL) {
-                SDL_Rect rect = { .x = x+1, .y = y+1, .h = CELL_SIZE, .w = CELL_SIZE };
-                if (SDL_RenderFillRect(r, &rect) != 0) exit(1);
+            if (get_map_square(x, y) == WALL) {
+                SDL_Rect rect = { .x = x + 1, .y = y + 1, .h = CELL_SIZE, .w = CELL_SIZE };
+                if (SDL_RenderFillRect(game.renderer, &rect) != 0) exit(1);
             }
         }
     }
 }
 
-void draw_line(SDL_Color color, V2 a, V2 b, i32 padding)
+internal void draw_line(SDL_Color color, V2 a, V2 b, i32 padding)
 {
     set_draw_color(color);
 
     for (i32 i = -padding; i <= padding; i++) {
-        if (SDL_RenderDrawLine(r, a.x + i, a.y + i, b.x + i, b.y + i) != 0) exit(1);
+        if (SDL_RenderDrawLine(game.renderer, a.x + i, a.y + i, b.x + i, b.y + i) != 0) exit(1);
     }
 }
 
-void draw_grid(SDL_Color color)
+internal void draw_grid(SDL_Color color)
 {
     for (u64 y = CELL_SIZE; y < WINDOW_HEIGHT; y += CELL_SIZE) {
         draw_line(color, (V2){ .x = 0, .y = y }, (V2){ .x = WINDOW_WIDTH, .y = y }, 0);
@@ -153,7 +181,7 @@ void draw_grid(SDL_Color color)
     }
 }
 
-void draw_circle(SDL_Color color, V2 a, i32 radius)
+internal void draw_circle(SDL_Color color, V2 a, i32 radius)
 {
     f32 acc = radius * 2;
     f32 radius_sq = radius * radius;
@@ -170,7 +198,7 @@ void draw_circle(SDL_Color color, V2 a, i32 radius)
     }
 }
 
-V2 find_intersect(V2 a, V2 b)
+internal V2 find_intersect(V2 a, V2 b)
 {
     V2 u = v2_sub(b, a);
     f32 l = v2_len(u);
@@ -184,11 +212,10 @@ V2 find_intersect(V2 a, V2 b)
 
         // check for oob
         if ((0 > x || x > WINDOW_WIDTH) || (0 > y || y > WINDOW_HEIGHT)) return intersect;
-        i32 pos = map_square(x, y);
 
         if (
-            (x % CELL_SIZE == 0 && (pos == WALL || (u.x < 0 && map_square(x - 1, y) == WALL))) || 
-            (y % CELL_SIZE == 0 && (pos == WALL || (u.y < 0 && map_square(x, y - 1) == WALL)))
+            (x % CELL_SIZE == 0 && (is_wall(x, y) || (u.x < 0 && is_wall(x - 1, y)))) || 
+            (y % CELL_SIZE == 0 && (is_wall(x, y) || (u.y < 0 && is_wall(x, y - 1))))
            ) {
             V2 intersect = { .x = x, .y = y };
             return intersect;
@@ -196,29 +223,30 @@ V2 find_intersect(V2 a, V2 b)
     }
 }
 
-void draw_intersect(SDL_Color color, V2 a, V2 b)
+internal void draw_intersect(SDL_Color color, V2 a, V2 b)
 {
     V2 intersect = find_intersect(a, b);
-    draw_circle(color, intersect, 6);
+    u32 radius = 6;
+    draw_circle(color, intersect, radius);
 }
 
-f64 time_in_seconds(void)
+internal inline f64 time_in_seconds(void)
 {
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);
     return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
-void update_overlay_message(Overlay *overlay, f64 begin, f64 now)
+internal inline void update_overlay_message(Overlay *overlay, f64 begin, f64 now)
 {
     f64 dt = now - begin;
     u64 fps = 1 / dt;
     sprintf(overlay->msg, overlay->msg_format, WINDOW_WIDTH, WINDOW_HEIGHT, fps);
 }
 
-bool is_key_pressed(i32 key)
+internal inline bool is_key_pressed(i32 key)
 {
-    return event.key.keysym.sym == key;
+    return game.event.key.keysym.sym == key;
 }
 
 i32 main(void)
@@ -228,49 +256,39 @@ i32 main(void)
         return 1;
     }
 
-    w = SDL_CreateWindow("Raycas", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
-    if (!w) {
-        printf("ERROR: could not create window\n");
-        return 1;
-    }
-
-    r = SDL_CreateRenderer(w, -1, 0);
-    if (!r) {
-        printf("ERROR: could not create renderer\n");
-        return 1;
-    }
-
     if (TTF_Init() != 0) {
         printf("ERROR: could not initialize ttf\n");
         return 1;
     }
 
+    init_game(&game);
+
     Font font = { 0 };
-    init_font(&font, 24, "fonts/CascadiaMono.ttf");
+    init_font(&font, "fonts/CascadiaMono.ttf", 24);
 
     Overlay overlay = { .state = OVERLAY_STATE_HIDDEN, .msg_format = "RESOLUTION: %dx%d, FPS: %d" };
 
-    State state = { 0 };
     Player player = { .pos.x = 200, .pos.y = 200, .color = blue, .velocity = 1.0f, .radius = 6};
     Camera camera = { .radius = 6 };
     const u8 *keystate = SDL_GetKeyboardState(NULL);
 
-    while (!state.quit) {
+    while (!game.quit) {
         f64 begin = time_in_seconds();
     
-        while (SDL_PollEvent(&event)) {
-            switch (event.type) {
-            case SDL_QUIT:
-                state.quit = true;
-                break;
-            case SDL_KEYDOWN:
-                if (is_key_pressed(SDLK_ESCAPE)) {
-                    state.quit = true;
-                }
-                else if (is_key_pressed(SDLK_o)) {
-                    overlay.state = (overlay.state + 1) % __overlay_state_count;
-                }
-                break;
+        while (SDL_PollEvent(&game.event)) {
+            switch (game.event.type) {
+                case SDL_QUIT: {
+                    game.quit = true;
+                } break;
+
+                case SDL_KEYDOWN: {
+                    if (is_key_pressed(SDLK_ESCAPE)) {
+                        game.quit = true;
+                    }
+                    else if (is_key_pressed(SDLK_o)) {
+                        overlay.state = (overlay.state + 1) % __overlay_state_count;
+                    }
+                } break;
             }
         }
 
@@ -280,9 +298,9 @@ i32 main(void)
         if (keystate[SDL_SCANCODE_D]) player.pos.x += player.velocity;
 
         // get mouse state
-        SDL_GetMouseState(&state.pos.x, &state.pos.y);
+        SDL_GetMouseState(&game.cursor.x, &game.cursor.y);
 
-        player.dir = v2_cell(v2_sub(state.pos, player.pos));
+        player.dir = v2_cell(v2_sub(game.cursor, player.pos));
 
         // compute camera coordinates
         camera.center = v2_add(player.pos, player.dir);
@@ -295,7 +313,7 @@ i32 main(void)
         // V2 x = v2_add(v2_sub(camera.center, camera.a), v2f_to_v2(v2f_scale(v2f_unit(player.dir), v2_len(camera.a_intersect))));
 
         set_draw_color(white);
-        SDL_RenderClear(r);
+        SDL_RenderClear(game.renderer);
 
 // #if 0
         draw_walls(gray);
@@ -321,18 +339,18 @@ i32 main(void)
 // #endif
 
         SDL_Surface *surface = TTF_RenderText_Shaded(font.font, overlay.msg, black, black_trans);
-        SDL_Texture *texture = SDL_CreateTextureFromSurface(r, surface);
-        const SDL_Rect rect = {.x = 0, .y = 0, .w = font.width * strlen(overlay.msg), .h = font.height};
+        SDL_Texture *texture = SDL_CreateTextureFromSurface(game.renderer, surface);
+        const SDL_Rect rect = { .x = 0, .y = 0, .w = font.width * strlen(overlay.msg), .h = font.height };
         SDL_FreeSurface(surface);
 
         switch (overlay.state) {
-        case OVERLAY_STATE_HIDDEN:  break;
-        case OVERLAY_STATE_SHOWN:   SDL_RenderCopy(r, texture, NULL, &rect); break;
-        case __overlay_state_count: break;
+            case OVERLAY_STATE_HIDDEN:  break;
+            case OVERLAY_STATE_SHOWN:   SDL_RenderCopy(game.renderer, texture, NULL, &rect); break;
+            case __overlay_state_count: break;
         }
 
         // draw to window
-        SDL_RenderPresent(r);
+        SDL_RenderPresent(game.renderer);
         
         f64 now = time_in_seconds();
 
