@@ -79,7 +79,7 @@ internal void init_font(Font *font, const char *path, i32 height)
 typedef enum {
     OVERLAY_STATE_HIDDEN,
     OVERLAY_STATE_SHOWN,
-    __overlay_state_count,
+    _overlay_state_count,
 } Overlay_State;
 
 typedef struct {
@@ -126,7 +126,6 @@ internal void init_game(Game *game)
                                     WINDOW_WIDTH,
                                     WINDOW_HEIGHT,
                                     0);
-
     if (!game->window) {
         printf("ERROR: could not create window\n");
         exit(1);
@@ -154,7 +153,7 @@ internal void draw_walls(SDL_Color color)
     for (u64 y = 0; y < WINDOW_HEIGHT; y += CELL_SIZE) {
         for (u64 x = 0; x < WINDOW_WIDTH; x += CELL_SIZE) {
             if (get_map_square(x, y) == WALL) {
-                SDL_Rect rect = { .x = x + 1, .y = y + 1, .h = CELL_SIZE, .w = CELL_SIZE };
+                SDL_Rect rect = { .x = x, .y = y, .h = CELL_SIZE, .w = CELL_SIZE };
                 if (SDL_RenderFillRect(game.renderer, &rect) != 0) exit(1);
             }
         }
@@ -198,7 +197,12 @@ internal void draw_circle(SDL_Color color, V2 a, i32 radius)
     }
 }
 
-internal V2 find_intersect(V2 a, V2 b)
+typedef struct {
+    V2 pos;
+    bool vertical;
+} Intersect;
+
+internal Intersect find_intersect(V2 a, V2 b)
 {
     V2 u = v2_sub(b, a);
     f32 l = v2_len(u);
@@ -208,16 +212,23 @@ internal V2 find_intersect(V2 a, V2 b)
         i32 x = a.x + t * u.x;
         i32 y = a.y + t * u.y;
 
-        V2 intersect = { .x = x, .y = y };
+        V2 pos = { .x = x, .y = y };
+        Intersect intersect = { .pos = pos, .vertical = false };
 
         // check for oob
-        if ((0 > x || x > WINDOW_WIDTH) || (0 > y || y > WINDOW_HEIGHT)) return intersect;
+        if (0 > x || x >= WINDOW_WIDTH) {
+            intersect.vertical = true;
+            return intersect;
+        }
+        if (0 > y || y >= WINDOW_HEIGHT) {
+            return intersect;
+        }
 
-        if (
-            (x % CELL_SIZE == 0 && (is_wall(x, y) || (u.x < 0 && is_wall(x - 1, y)))) || 
-            (y % CELL_SIZE == 0 && (is_wall(x, y) || (u.y < 0 && is_wall(x, y - 1))))
-           ) {
-            V2 intersect = { .x = x, .y = y };
+        if (x % CELL_SIZE == 0 && (is_wall(x, y) || (u.x < 0 && is_wall(x - 1, y)))) {
+            intersect.vertical = true;
+            return intersect;
+        }
+        if (y % CELL_SIZE == 0 && (is_wall(x, y) || (u.y < 0 && is_wall(x, y - 1)))) {
             return intersect;
         }
     }
@@ -225,9 +236,9 @@ internal V2 find_intersect(V2 a, V2 b)
 
 internal void draw_intersect(SDL_Color color, V2 a, V2 b)
 {
-    V2 intersect = find_intersect(a, b);
+    Intersect intersect = find_intersect(a, b);
     u32 radius = 6;
-    draw_circle(color, intersect, radius);
+    draw_circle(color, intersect.pos, radius);
 }
 
 internal inline f64 time_in_seconds(void)
@@ -247,6 +258,44 @@ internal inline void update_overlay_message(Overlay *overlay, f64 begin, f64 now
 internal inline bool is_key_pressed(i32 key)
 {
     return game.event.key.keysym.sym == key;
+}
+
+internal void draw_3d_buffer(V2 a, V2 b)
+{
+    V2 u = v2_sub(b, a);
+    f32 l = v2_len(u);
+    f32 step = l / WINDOW_WIDTH;
+
+    for (f32 i = 0;; i += step) {
+        f32 t = i / l;
+        i32 x = a.x + t * u.x;
+        i32 y = a.y + t * u.y;
+
+        V2 pos = { .x = x, .y = y };
+        Intersect intersect = { .pos = pos, .vertical = false };
+
+        if (x < a.x || x > b.x || y < a.y || y > b.y) return;
+
+        draw_circle(cyan, pos, 2);
+        // Intersect intersect = draw;
+
+        // // check for oob
+        // if (0 > x || x >= WINDOW_WIDTH) {
+        //     intersect.vertical = true;
+        //     return intersect;
+        // }
+        // if (0 > y || y >= WINDOW_HEIGHT) {
+        //     return intersect;
+        // }
+        //
+        // if (x % CELL_SIZE == 0 && (is_wall(x, y) || (u.x < 0 && is_wall(x - 1, y)))) {
+        //     intersect.vertical = true;
+        //     return intersect;
+        // }
+        // if (y % CELL_SIZE == 0 && (is_wall(x, y) || (u.y < 0 && is_wall(x, y - 1)))) {
+        //     return intersect;
+        // }
+    }
 }
 
 i32 main(void)
@@ -271,6 +320,7 @@ i32 main(void)
     Player player = { .pos.x = 200, .pos.y = 200, .color = blue, .velocity = 1.0f, .radius = 6};
     Camera camera = { .radius = 6 };
     const u8 *keystate = SDL_GetKeyboardState(NULL);
+    bool show_map = true;
 
     while (!game.quit) {
         f64 begin = time_in_seconds();
@@ -286,7 +336,10 @@ i32 main(void)
                         game.quit = true;
                     }
                     else if (is_key_pressed(SDLK_o)) {
-                        overlay.state = (overlay.state + 1) % __overlay_state_count;
+                        overlay.state = (overlay.state + 1) % _overlay_state_count;
+                    }
+                    else if (is_key_pressed(SDLK_m)) {
+                        show_map = !show_map;
                     }
                 } break;
             }
@@ -306,37 +359,50 @@ i32 main(void)
         camera.center = v2_add(player.pos, player.dir);
         camera.a = v2_add(camera.center, v2_normal(player.dir));
         camera.b = v2_add(camera.center, v2_scale(v2_normal(player.dir), -1));
+        
+        // NOTE: We only need the position of the intersects when drawing to the 2D map
+        camera.a_intersect = find_intersect(camera.a, v2_add(camera.a, v2_scale(v2_sub(camera.a, player.pos), 16))).pos;
+        camera.b_intersect = find_intersect(camera.b, v2_add(camera.b, v2_scale(v2_sub(camera.b, player.pos), 16))).pos;
 
-        camera.a_intersect = find_intersect(camera.a, v2_add(camera.a, v2_scale(v2_sub(camera.a, player.pos), 16)));
-        camera.b_intersect = find_intersect(camera.b, v2_add(camera.b, v2_scale(v2_sub(camera.b, player.pos), 16)));
+        // TODO: Find a better name for dir_break_at_len
+        V2 dir_break_at_len = v2f_to_v2(v2f_scale(v2f_unit(player.dir), v2_len(v2_sub(camera.a, camera.a_intersect))));
 
-        // V2 x = v2_add(v2_sub(camera.center, camera.a), v2f_to_v2(v2f_scale(v2f_unit(player.dir), v2_len(camera.a_intersect))));
+        f32 perp_wall_dist = v2_len(dir_break_at_len);
+        i32 wall_height = WINDOW_HEIGHT / perp_wall_dist;
+
+        i32 wall_top = (-wall_height / 2) + (WINDOW_HEIGHT / 2);
+        if (wall_top < 0) wall_top = 0;
+
+        i32 wall_bottom = (wall_height / 2) + (WINDOW_HEIGHT / 2);
+        if (wall_bottom >= WINDOW_HEIGHT) wall_top = WINDOW_HEIGHT - 1;
 
         set_draw_color(white);
         SDL_RenderClear(game.renderer);
 
-// #if 0
-        draw_walls(gray);
-        draw_grid(black);
+        if (show_map) {
+            draw_walls(gray);
+            draw_grid(black);
 
-        // draw player and intersects with grid
-        draw_circle(player.color, player.pos, player.radius);
+            // draw player and intersects with grid
+            draw_circle(player.color, player.pos, player.radius);
 
-        // scale by 16 to ensure that it searches for intersects far away
-        draw_intersect(green, player.pos, v2_add(player.pos, v2_scale(player.dir, 16)));
+            // scale by 16 to ensure that it searches for intersects far away
+            draw_intersect(green, player.pos, v2_add(player.pos, v2_scale(player.dir, 16)));
 
-        // draw camera
-        draw_circle(black, camera.center, camera.radius);
-        draw_line(black, player.pos, camera.center, 1);
-        draw_line(blue, camera.a, camera.b, 1);
-        draw_line(red, player.pos, camera.a, 1);
-        draw_line(red, player.pos, camera.b, 1);
-        
-        draw_line(purple, camera.a, camera.a_intersect, 1);
-        draw_line(purple, camera.b, camera.b_intersect, 1);
-        
-        // draw_line(cyan, camera.a, x, 1);
-// #endif
+            // draw camera
+            draw_circle(black, camera.center, camera.radius);
+            draw_line(black, player.pos, camera.center, 1);
+            draw_line(blue, camera.a, camera.b, 1);
+            draw_line(red, player.pos, camera.a, 1);
+            draw_line(red, player.pos, camera.b, 1);
+
+            draw_line(purple, camera.a, camera.a_intersect, 1);
+            draw_line(purple, camera.b, camera.b_intersect, 1);
+            draw_3d_buffer(camera.b_intersect, camera.a_intersect);
+        }
+        else {
+            // draw_3d_buffer(camera.b, camera.a);
+        }
 
         SDL_Surface *surface = TTF_RenderText_Shaded(font.font, overlay.msg, black, black_trans);
         SDL_Texture *texture = SDL_CreateTextureFromSurface(game.renderer, surface);
@@ -346,7 +412,7 @@ i32 main(void)
         switch (overlay.state) {
             case OVERLAY_STATE_HIDDEN:  break;
             case OVERLAY_STATE_SHOWN:   SDL_RenderCopy(game.renderer, texture, NULL, &rect); break;
-            case __overlay_state_count: break;
+            case _overlay_state_count: break;
         }
 
         // draw to window
