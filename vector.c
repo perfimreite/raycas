@@ -65,6 +65,7 @@ f32 v2_len(V2 a)
     return sqrt(v2_square_len(a));
 }
 
+
 V2f v2f_scale(V2f a, f32 k)
 {
 	return (V2f){ .x = (f32)a.x * k, .y = (f32)a.y * k };
@@ -89,3 +90,9 @@ V2 v2f_to_v2(V2f a)
 {
     return (V2){ .x = a.x, .y = a.y };
 }
+
+f64 v2_dot_product(V2 a, V2 b)
+{
+	return a.x * b.x + a.y * b.y;
+}
+

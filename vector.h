@@ -28,5 +28,6 @@ V2f v2f_unit(V2 a);
 V2f v2_to_v2f(V2 a);
 f32 v2_len(V2 a);
 i32 v2_square_len(V2 a);
+f64 v2_dot_product(V2 a, V2 b);
 
 #endif // VECTOR_H
