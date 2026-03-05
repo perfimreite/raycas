@@ -9,76 +9,69 @@
 
 V2 zero_vector = { .x = 0, .y = 0 };
 
-
-bool v2_eq(V2 a, V2 b)
+bool v2f_eq(V2f a, V2f b)
 {
 	return a.x == b.x && a.y == b.y;
 }
 
-V2 v2_add(V2 a, V2 b)
+V2f v2f_add(V2f a, V2f b)
 {
-	return (V2){ .x = a.x + b.x, .y = a.y + b.y };
+	return (V2f){ .x = a.x + b.x, .y = a.y + b.y };
 }
 
-V2 v2_sub(V2 a, V2 b)
+V2f v2f_sub(V2f a, V2f b)
 {
-	return (V2){ .x = a.x - b.x, .y = a.y - b.y };
+	return (V2f){ .x = a.x - b.x, .y = a.y - b.y };
 }
 
-V2 v2_mul(V2 a, V2 b)
+V2f v2f_mul(V2f a, V2f b)
 {
-	return (V2){ .x = a.x * b.x, .y = a.y * b.y };
+	return (V2f){ .x = a.x * b.x, .y = a.y * b.y };
 }
 
-V2 v2_div(V2 a, V2 b)
+V2f v2f_div(V2f a, V2f b)
 {
-	return (V2){ .x = a.x / b.x, .y = a.y / b.y };
+	return (V2f){ .x = a.x / b.x, .y = a.y / b.y };
 }
 
-V2 v2_cell(V2 a)
+V2f v2f_cell(V2f a)
 {
-    return v2f_to_v2(v2f_scale(v2f_unit(a), CELL_SIZE_F32));
+    return v2f_scale(v2f_unit(a), (f32)CELL_SIZE);
 }
 
-V2 v2_normal(V2 a)
+V2f v2f_normal(V2f a)
 {
-	return (V2){ .x = -a.y, .y = a.x };
+	return (V2f){ .x = -a.y, .y = a.x };
 }
 
-V2  v2_scale(V2 a, i32 k)
+V2f v2f_scale(V2f a, f32 k)
 {
-	return (V2){ .x = a.x * k, .y = a.y * k };
+	return (V2f){ .x = a.x * k, .y = a.y * k };
 }
 
-bool v2_zero(V2 a)
+bool v2f_zero(V2f a)
 {
-    return v2_eq(a, zero_vector);
+    return v2f_eq(a, v2_to_v2f(zero_vector));
 }
 
-i32 v2_square_len(V2 a)
+f32 v2f_square_len(V2f a)
 {
     return a.x * a.x + a.y * a.y;
 }
 
-f32 v2_len(V2 a)
+f32 v2f_len(V2f a)
 {
-    return sqrt(v2_square_len(a));
+    return sqrt(v2f_square_len(a));
 }
 
-
-V2f v2f_scale(V2f a, f32 k)
-{
-	return (V2f){ .x = (f32)a.x * k, .y = (f32)a.y * k };
-}
-
-V2f v2f_unit(V2 a)
+V2f v2f_unit(V2f a)
 {
 	// assert(!v2_zero(a));
 
-    if (v2_zero(a)) return v2_to_v2f(a);
+    if (v2f_zero(a)) return a;
 
-	f32 l = v2_len(a);
-	return v2f_scale(v2_to_v2f(a), 1.0f / l);
+	f32 l = v2f_len(a);
+	return v2f_scale(a, 1.0f / l);
 }
 
 V2f v2_to_v2f(V2 a)
@@ -91,8 +84,19 @@ V2 v2f_to_v2(V2f a)
     return (V2){ .x = a.x, .y = a.y };
 }
 
-f64 v2_dot_product(V2 a, V2 b)
+f64 v2f_dot_product(V2f a, V2f b)
 {
 	return a.x * b.x + a.y * b.y;
+}
+
+V2f v2f_rotate(V2f a, f32 angle)
+{
+    f32 c_angle = cos(angle);
+    f32 s_angle = sin(angle);
+
+    f32 x = a.x * c_angle - a.y * s_angle;
+    f32 y = a.x * s_angle + a.y * c_angle;
+
+    return (V2f){ .x = x, .y = y };
 }
 

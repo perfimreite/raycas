@@ -15,19 +15,19 @@ typedef struct {
 
 extern V2 zero_vector;
 
-V2  v2_add(V2 a, V2 b);
-V2  v2_sub(V2 a, V2 b);
-V2  v2_mul(V2 a, V2 b);
-V2  v2_div(V2 a, V2 b);
-V2  v2_cell(V2 a);
-V2  v2_normal(V2 a);
-V2  v2_scale(V2 a, i32 k);
-V2  v2f_to_v2(V2f a);
+V2 v2f_to_v2(V2f a);
+V2f v2f_add(V2f a, V2f b);
+V2f v2f_sub(V2f a, V2f b);
+V2f v2f_mul(V2f a, V2f b);
+V2f v2f_div(V2f a, V2f b);
+V2f v2f_cell(V2f a);
+V2f v2f_normal(V2f a);
 V2f v2f_scale(V2f a, f32 k);
-V2f v2f_unit(V2 a);
+V2f v2f_unit(V2f a);
 V2f v2_to_v2f(V2 a);
-f32 v2_len(V2 a);
-i32 v2_square_len(V2 a);
+f32 v2f_len(V2f a);
+f32 v2f_square_len(V2f a);
 f64 v2_dot_product(V2 a, V2 b);
+V2f v2f_rotate(V2f a, f32 angle);
 
 #endif // VECTOR_H

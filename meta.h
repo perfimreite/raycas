@@ -15,7 +15,6 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 typedef float    f32;
 typedef double   f64;
-typedef size_t   size;
 
 /* === descriptive alternatives for `static` === */
 #define internal      static
@@ -26,5 +25,10 @@ typedef size_t   size;
 #define UNUSED(value) (void)(value)
 #define TODO(message) do { fprintf(stderr, "%s:%d: TODO: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
 #define UNREACHABLE(message) do { fprintf(stderr, "%s:%d: UNREACHABLE: %s\n", __FILE__, __LINE__, message); abort(); } while(0)
+
+/* === helper macros for math === */
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define CLAMP(x, min, max) MIN(MAX((x), (min)), (max))
 
 #endif // META_H
