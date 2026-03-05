@@ -29,5 +29,6 @@ f32 v2f_len(V2f a);
 f32 v2f_square_len(V2f a);
 f64 v2_dot_product(V2 a, V2 b);
 V2f v2f_rotate(V2f a, f32 angle);
+f32 distance_point_to_line(V2f point, f32 a, f32 b, f32 c);
 
 #endif // VECTOR_H

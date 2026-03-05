@@ -100,3 +100,7 @@ V2f v2f_rotate(V2f a, f32 angle)
     return (V2f){ .x = x, .y = y };
 }
 
+f32 distance_point_to_line(V2f point, f32 a, f32 b, f32 c)
+{
+    return fabs(a * point.x + b * point.y + c) / sqrt(a * a + b * b);
+}

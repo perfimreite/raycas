@@ -1,11 +1,11 @@
 #include "constants.h"
+#include "map.h"
 #include "meta.h"
+#include "utils.h"
 #include "vector.h"
 
-#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <time.h>
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -28,35 +28,6 @@ global const SDL_Color cyan        = { .r = 0  , .g = 255, .b = 255, .a = 255 };
 // transparent colors
 global const SDL_Color black_trans = { .r = 0  , .g = 0  , .b = 0  , .a = 31 };
 
-// map
-#define EMPTY 0
-#define WALL  1
-
-global i32 map[ROWS][COLS] = {
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
-    {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0},
-    {0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
-    {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
-};
-
-internal i32 get_map_square(i32 x, i32 y)
-{
-    return map[y/CELL_SIZE][x/CELL_SIZE];
-}
-
-internal bool is_wall(i32 x, i32 y)
-{
-    return get_map_square(x, y) == WALL;
-}
-
 typedef struct {
     i32 height;
     i32 width;
@@ -75,7 +46,7 @@ internal void init_font(Font *font, const char *path, i32 height)
 
     font->font = TTF_OpenFont(path, height);
     if (!font->font) {
-        printf("ERROR: could not load font\n");
+        fprintf(stderr, "ERROR: could not load font\n");
         exit(1);
     }
 }
@@ -133,13 +104,13 @@ internal void init_game(Game *game)
                                     WINDOW_HEIGHT,
                                     0);
     if (!game->window) {
-        printf("ERROR: could not create window\n");
+        fprintf(stderr, "ERROR: could not create window\n");
         exit(1);
     }
 
     game->renderer = SDL_CreateRenderer(game->window, -1, 0);
     if (!game->renderer) {
-        printf("ERROR: could not create renderer\n");
+        fprintf(stderr, "ERROR: could not create renderer\n");
         exit(1);
     }
 
@@ -152,7 +123,7 @@ internal void init_game(Game *game)
 internal void set_draw_color(SDL_Color color)
 {
     if (SDL_SetRenderDrawColor(game.renderer, color.r, color.g, color.b, color.a) != 0) {
-        printf("ERROR: could not set render draw color\n");
+        fprintf(stderr, "ERROR: could not set render draw color\n");
         exit(1);
     }
 }
@@ -252,13 +223,6 @@ internal void draw_intersect(SDL_Color color, V2f a, V2f b)
     draw_circle(color, v2_to_v2f(intersect.pos), radius);
 }
 
-internal inline f64 time_in_seconds(void)
-{
-    struct timespec ts;
-    timespec_get(&ts, TIME_UTC);
-    return ts.tv_sec + ts.tv_nsec / 1e9;
-}
-
 internal inline void update_overlay_message(Overlay *overlay, f64 begin, f64 now)
 {
     f64 dt = now - begin;
@@ -271,12 +235,7 @@ internal inline bool is_key_pressed(i32 key)
     return game.event.key.keysym.sym == key;
 }
 
-internal f32 distance_point_to_line(V2f point, f32 a, f32 b, f32 c)
-{
-    return fabs(a * point.x + b * point.y + c) / sqrt(a * a + b * b);
-}
-
-internal void draw_3d_buffer(Player player, Camera camera) // only need player pos and dir really...
+internal void draw_3d_buffer(Player player, Camera camera)
 {
     f32 theta = player.fov;
     f32 half_theta = theta / 2.0f;
@@ -347,11 +306,6 @@ internal void draw_player_fov(SDL_Color color, Player player, Camera camera, u32
     }
 }
 
-internal f32 degrees_to_radians(f32 angle)
-{
-    return angle * M_PI / 180.0f;
-}
-
 internal void draw_map(Player player, Camera camera)
 {
     // game.show_map_fullscreen
@@ -400,12 +354,12 @@ internal void draw_map(Player player, Camera camera)
 i32 main(void)
 {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
-        printf("ERROR: could not initialize window\n");
+        fprintf(stderr, "ERROR: could not initialize window\n");
         return 1;
     }
 
     if (TTF_Init() != 0) {
-        printf("ERROR: could not initialize ttf\n");
+        fprintf(stderr, "ERROR: could not initialize ttf\n");
         return 1;
     }
 
