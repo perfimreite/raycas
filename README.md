@@ -5,6 +5,7 @@ Raycas is a game engine built using the raycasting rendering technique to create
 ## Sources
 
 - https://lodev.org/cgtutor/raycasting.html
+- https://wiki.libsdl.org/SDL2/APIByCategory
 
 ## Dependecies
 

@@ -1,57 +1,69 @@
 #include "constants.h"
 #include "vector.h"
 
-#include "meta.h"
-#include "math.h"
+#include <math.h>
 
-#include <assert.h>
-#include <stdbool.h>
+V2f zero_vector = { .x = 0, .y = 0 };
 
-V2 zero_vector = { .x = 0, .y = 0 };
+bool v2f_zero(V2f a)
+{
+    return v2f_eq(a, zero_vector);
+}
 
 bool v2f_eq(V2f a, V2f b)
 {
-	return a.x == b.x && a.y == b.y;
+    return a.x == b.x && a.y == b.y;
+}
+
+V2f make_v2f(f32 x, f32 y)
+{
+    return (V2f){ .x = x, .y = y};
 }
 
 V2f v2f_add(V2f a, V2f b)
 {
-	return (V2f){ .x = a.x + b.x, .y = a.y + b.y };
+    return (V2f){ .x = a.x + b.x, .y = a.y + b.y };
 }
 
 V2f v2f_sub(V2f a, V2f b)
 {
-	return (V2f){ .x = a.x - b.x, .y = a.y - b.y };
+    return (V2f){ .x = a.x - b.x, .y = a.y - b.y };
 }
 
-V2f v2f_mul(V2f a, V2f b)
+V2f v2f_unit(V2f a)
 {
-	return (V2f){ .x = a.x * b.x, .y = a.y * b.y };
-}
+    if (v2f_zero(a)) {
+        return a;
+    }
 
-V2f v2f_div(V2f a, V2f b)
-{
-	return (V2f){ .x = a.x / b.x, .y = a.y / b.y };
+    f32 l = v2f_len(a);
+    return v2f_scale(a, 1.0f / l);
 }
 
 V2f v2f_cell(V2f a)
 {
-    return v2f_scale(v2f_unit(a), (f32)CELL_SIZE);
+    return v2f_scale(v2f_unit(a), CELL_SIZE);
 }
 
 V2f v2f_normal(V2f a)
 {
-	return (V2f){ .x = -a.y, .y = a.x };
+    return (V2f){ .x = -a.y, .y = a.x };
 }
 
 V2f v2f_scale(V2f a, f32 k)
 {
-	return (V2f){ .x = a.x * k, .y = a.y * k };
+    return (V2f){ .x = a.x * k, .y = a.y * k };
 }
 
-bool v2f_zero(V2f a)
+V2f v2f_rotate(V2f a, f32 angle)
 {
-    return v2f_eq(a, v2_to_v2f(zero_vector));
+    f32 c_angle = cosf(angle);
+    f32 s_angle = sinf(angle);
+
+    f32 x = a.x * c_angle - a.y * s_angle;
+    f32 y = a.x * s_angle + a.y * c_angle;
+
+    return (V2f){ .x = x, .y = y };
 }
 
 f32 v2f_square_len(V2f a)
@@ -64,43 +76,22 @@ f32 v2f_len(V2f a)
     return sqrt(v2f_square_len(a));
 }
 
-V2f v2f_unit(V2f a)
+f32 v2f_dot_product(V2f a, V2f b)
 {
-	// assert(!v2_zero(a));
-
-    if (v2f_zero(a)) return a;
-
-	f32 l = v2f_len(a);
-	return v2f_scale(a, 1.0f / l);
+    return a.x * b.x + a.y * b.y;
 }
 
-V2f v2_to_v2f(V2 a)
+Line line_from_points(V2f a, V2f b)
 {
-    return (V2f){ .x = (f32)a.x, .y = (f32)a.y };
+    f32 la = a.y - b.y;
+    f32 lb = b.x - a.x;
+    f32 lc = a.x * b.y - b.x * a.y;
+
+    return (Line){ .a = la, .b = lb, .c = lc };
 }
 
-V2 v2f_to_v2(V2f a)
+f32 distance_point_to_line(V2f p, Line l)
 {
-    return (V2){ .x = a.x, .y = a.y };
+    return fabs(l.a * p.x + l.b * p.y + l.c) / sqrt(l.a * l.a + l.b * l.b);
 }
 
-f64 v2f_dot_product(V2f a, V2f b)
-{
-	return a.x * b.x + a.y * b.y;
-}
-
-V2f v2f_rotate(V2f a, f32 angle)
-{
-    f32 c_angle = cos(angle);
-    f32 s_angle = sin(angle);
-
-    f32 x = a.x * c_angle - a.y * s_angle;
-    f32 y = a.x * s_angle + a.y * c_angle;
-
-    return (V2f){ .x = x, .y = y };
-}
-
-f32 distance_point_to_line(V2f point, f32 a, f32 b, f32 c)
-{
-    return fabs(a * point.x + b * point.y + c) / sqrt(a * a + b * b);
-}

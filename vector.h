@@ -1,34 +1,38 @@
 #include "meta.h"
 
+#include <stdbool.h>
+
 #ifndef VECTOR_H
 #define VECTOR_H
 
 typedef struct {
-	i32 x;
-	i32 y;
-} V2;
-
-typedef struct {
-	f32 x;
-	f32 y;
+    f32 x;
+    f32 y;
 } V2f;
 
-extern V2 zero_vector;
+extern V2f zero_vector;
+bool v2f_zero(V2f a);
+bool v2f_eq(V2f a, V2f b);
 
-V2 v2f_to_v2(V2f a);
+V2f make_v2f(f32 x, f32 y);
 V2f v2f_add(V2f a, V2f b);
 V2f v2f_sub(V2f a, V2f b);
-V2f v2f_mul(V2f a, V2f b);
-V2f v2f_div(V2f a, V2f b);
+V2f v2f_unit(V2f a);
 V2f v2f_cell(V2f a);
 V2f v2f_normal(V2f a);
 V2f v2f_scale(V2f a, f32 k);
-V2f v2f_unit(V2f a);
-V2f v2_to_v2f(V2 a);
-f32 v2f_len(V2f a);
-f32 v2f_square_len(V2f a);
-f64 v2_dot_product(V2 a, V2 b);
 V2f v2f_rotate(V2f a, f32 angle);
-f32 distance_point_to_line(V2f point, f32 a, f32 b, f32 c);
 
+f32 v2f_square_len(V2f a);
+f32 v2f_len(V2f a);
+f32 v2f_dot_product(V2f a, V2f b);
+
+typedef struct {
+    f32 a;
+    f32 b;
+    f32 c;
+} Line;
+
+Line line_from_points(V2f a, V2f b);
+f32 distance_point_to_line(V2f p, Line l);
 #endif // VECTOR_H

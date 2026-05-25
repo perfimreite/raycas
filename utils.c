@@ -7,8 +7,13 @@ f64 time_in_seconds(void)
     return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
-f32 degrees_to_radians(f32 angle)
+f32 radians_from_degrees(f32 angle)
 {
     return angle * M_PI / 180.0f;
+}
+
+f32 degrees_from_radians(f32 angle)
+{
+    return angle * 180.0f / M_PI;
 }
 
