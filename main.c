@@ -23,7 +23,7 @@ global const SDL_Color red         = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
 global const SDL_Color green       = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
 global const SDL_Color blue        = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
 global const SDL_Color light_blue  = { .r = 191, .g = 191, .b = 255, .a = 255 };
-global const SDL_Color purple      = { .r = 255, .g = 0  , .b = 255, .a = 255 };
+global const SDL_Color magenta     = { .r = 255, .g = 0  , .b = 255, .a = 255 };
 global const SDL_Color cyan        = { .r = 0  , .g = 255, .b = 255, .a = 255 };
 global const SDL_Color orange      = { .r = 255, .g = 165, .b = 0  , .a = 255 };
 global const SDL_Color yellow      = { .r = 255, .g = 255, .b = 0  , .a = 255 };
@@ -92,19 +92,22 @@ typedef struct {
     SDL_Event event;
 
     bool show_map;
+    bool show_crosshair;
     bool quit;
 } Game;
 
 Game game = { 0 };
 
-internal void init_game(Game *game)
+internal void init_game(Game *game, const char *title)
 {
-    game->window = SDL_CreateWindow("Raycas",
+    game->window = SDL_CreateWindow(title,
                                     SDL_WINDOWPOS_CENTERED,
                                     SDL_WINDOWPOS_CENTERED,
                                     WINDOW_WIDTH,
                                     WINDOW_HEIGHT,
                                     0);
+    game->show_map = false;
+    game->show_crosshair = true;
     if (!game->window) {
         fprintf(stderr, "ERROR: could not create window\n");
         exit(1);
@@ -191,64 +194,64 @@ typedef struct {
 internal Intersect find_intersect(V2f pos, V2f dir)
 {
     V2f delta_dist = make_v2f(0, 0);
-    V2f map        = make_v2f(0, 0);
     V2f step       = make_v2f(0, 0);
-    V2f hit        = make_v2f(0, 0);
+    V2f side_dist  = make_v2f(0, 0);
+    V2f map        = make_v2f(0, 0);
 
-    delta_dist.x = dir.x == 0.0f ? 1e30 : fabs(1.0f / dir.x);
-    delta_dist.y = dir.y == 0.0f ? 1e30 : fabs(1.0f / dir.y);
+    delta_dist.x = dir.x == 0 ? 1e30 : fabs(1.0f / dir.x);
+    delta_dist.y = dir.y == 0 ? 1e30 : fabs(1.0f / dir.y);
 
-    map.x = floor(pos.x / CELL_SIZE);
-    map.y = floor(pos.y / CELL_SIZE);
+    V2f pos_tile_index = v2f_scale(pos, 1 / CELL_SIZE);
+    map.x = floor(pos_tile_index.x);
+    map.y = floor(pos_tile_index.y);
 
-    if (dir.x > 0) {
-        step.x = 1;
-        hit.x = (map.x + 1.0f - pos.x) * delta_dist.x;
-    } else {
+    if (dir.x < 0) {
         step.x = -1;
-        hit.x = (pos.x - map.x) * delta_dist.x;
-    }
-
-    if (dir.y > 0) {
-        step.y = 1;
-        hit.y = (map.y + 1.0f - pos.y) * delta_dist.y;
+        side_dist.x = (pos_tile_index.x - map.x) * delta_dist.x;
     } else {
-        step.y = -1;
-        hit.y = (pos.y - map.y) * delta_dist.y;
+        step.x = 1;
+        side_dist.x = (map.x + 1.0f - pos_tile_index.x) * delta_dist.x;
     }
 
-    // printf("%.2f, %.2f\n", hit.x, hit.y);
-
-    for (; !is_wall(hit.x, hit.y) && !is_perim(hit.x, hit.y);) {
-        // if (game.show_map) {
-        //     draw_circle(red, hit, 2);
-        // }
-
-        if (hit.x > hit.y) {
-            hit.x += delta_dist.x;
-            map.x += step.x;
-        } else {
-            hit.y += delta_dist.y;
-            map.y += step.y;
-        }
+    if (dir.y < 0) {
+        step.y = -1;
+        side_dist.y = (pos_tile_index.y - map.y) * delta_dist.y;
+    } else {
+        step.y = 1;
+        side_dist.y = (map.y + 1.0f - pos_tile_index.y) * delta_dist.y;
     }
 
     Intersect intersect = { 0 };
 
-    if (hit.x > hit.y) {
-        intersect.vertical = true;
+    for (;;) {
+        if (side_dist.x < side_dist.y) {
+            side_dist.x += delta_dist.x;
+            map.x += step.x;
+            intersect.vertical = false;
+        } else {
+            side_dist.y += delta_dist.y;
+            map.y += step.y;
+            intersect.vertical = true;
+        }
+
+        if (is_wall_tile(map.x, map.y)) {
+            break;
+        }
+
+        if (is_perim_tile(map.x, map.y)) {
+            intersect.perim = true;
+            break;
+        }
     }
 
-    if (is_perim(hit.x, hit.y)) {
-        intersect.perim = true;
-    }
-
-    intersect.pos = v2f_add(pos, hit);
-    intersect.perp_wall_dist = intersect.vertical ?  (hit.y - delta_dist.y) : (hit.x - delta_dist.x);
-
+    intersect.perp_wall_dist = intersect.vertical ? (side_dist.y - delta_dist.y) : (side_dist.x - delta_dist.x);
+    intersect.perp_wall_dist *= CELL_SIZE;
+    intersect.pos = v2f_add(pos, v2f_scale(dir, intersect.perp_wall_dist));
     return intersect;
 }
 
+// NOTE: old approach checks every pixle in a line following player.dir
+// this is very slow...
 // internal Intersect find_intersect(V2f a, V2f b)
 // {
 //     V2f u = v2f_sub(b, a);
@@ -284,10 +287,10 @@ internal Intersect find_intersect(V2f pos, V2f dir)
 //     }
 // }
 
-internal void draw_intersect(SDL_Color color, V2f a, V2f b)
+internal void draw_intersect(SDL_Color color, V2f pos, V2f dir)
 {
-    Intersect intersect = find_intersect(a, b);
-    u32 radius = 6;
+    Intersect intersect = find_intersect(pos, dir);
+    u32 radius = 4;
     draw_circle(color, intersect.pos, radius);
 }
 
@@ -301,12 +304,12 @@ internal void draw_3d_view(Player *player, Camera *camera)
     Line line = line_from_points(camera->a, camera->b);
 
     f32 angle = -half_theta;
-    u32 camera_x = 0;
-    for (; angle <= half_theta; angle += angle_step, camera_x++) {
+    u32 buffer_x = 0;
+    for (; angle <= half_theta; angle += angle_step, buffer_x++) {
         V2f curr_dir = v2f_rotate(player->dir, angle);
         Intersect intersect = find_intersect(player->pos, curr_dir);
 
-        #define WALL_HEIGHT_MULTIPLIER 64
+        #define WALL_HEIGHT_MULTIPLIER 32
         f32 perp_wall_dist = distance_point_to_line(intersect.pos, line);
         i32 wall_height = WINDOW_HEIGHT * WALL_HEIGHT_MULTIPLIER / perp_wall_dist;
 
@@ -322,12 +325,26 @@ internal void draw_3d_view(Player *player, Camera *camera)
             color = intersect.vertical ? gray : light_gray;
         }
 
-        V2f wall_start = make_v2f(camera_x, wall_top);
-        V2f wall_end   = make_v2f(camera_x, wall_bottom);
+        V2f wall_start = make_v2f(buffer_x, wall_top);
+        V2f wall_end   = make_v2f(buffer_x, wall_bottom);
 
-        draw_line(light_blue, make_v2f(camera_x, 0), wall_start, 0);
+        draw_line(light_blue, make_v2f(buffer_x, 0), wall_start, 0);
         draw_line(color,      wall_start, wall_end, 0);
-        draw_line(green,      wall_end, make_v2f(camera_x, WINDOW_HEIGHT), 0);
+        draw_line(green,      wall_end, make_v2f(buffer_x, WINDOW_HEIGHT), 0);
+    }
+
+    if (game.show_crosshair) {
+        f32 cx = WINDOW_WIDTH / 2.0f;
+        f32 cy = WINDOW_HEIGHT / 2.0f;
+        i32 l = 5.0f;
+        draw_line(white,
+                  make_v2f(cx, cy - l),
+                  make_v2f(cx, cy + l),
+                  0);
+        draw_line(white,
+                  make_v2f(cx - l, cy),
+                  make_v2f(cx + l, cy),
+                  0);
     }
 }
 
@@ -343,23 +360,25 @@ internal void draw_player_fov(Player *player, Camera *camera, u32 beam_spread)
     u32 wall_x = 0;
     for (; angle <= half_theta; angle += step, wall_x++) {
         if (wall_x % beam_spread == 0) {
+            // NOTE: from old find_intersect()
             // V2f u = v2f_add(player->pos, v2f_rotate(player->dir, angle));
             // Intersect intersect = find_intersect(player->pos, u);
 
             // new find_intersect() takes pos and dir, not pos and pos+dir)
             V2f dir = v2f_rotate(player->dir, angle);
             Intersect intersect = find_intersect(player->pos, dir);
-            draw_circle(cyan, intersect.pos, 1);
+
             f32 perp_wall_dist = distance_point_to_line(intersect.pos, line);
 
             // NOTE: only for debug
-#if 1
+#if 0
+            draw_circle(cyan, intersect.pos, 1);
             draw_line(orange, player->pos, intersect.pos, 0);
             draw_line(yellow, intersect.pos, v2f_sub(intersect.pos, v2f_scale(player->dir, perp_wall_dist)), 0);
-#endif
             if (wall_x == 0 || wall_x == WINDOW_WIDTH - 1) {
                 draw_line(purple, player->pos, intersect.pos, 1);
             }
+#endif
         }
     }
 }
@@ -374,13 +393,12 @@ internal void draw_map(Player *player, Camera *camera)
 
     // draw camera
     draw_circle(black, camera->center, camera->radius);
-    draw_line(purple, player->pos, camera->center, 1);
+    draw_line(magenta, player->pos, camera->center, 1);
     draw_line(blue, camera->a, camera->b, 1);
     draw_line(red, player->pos, camera->a, 1);
     draw_line(red, player->pos, camera->b, 1);
-    // draw_player_fov(player, camera, 4);
-
-    draw_intersect(blue, player->pos, player->dir);
+    draw_player_fov(player, camera, 4);
+    draw_intersect(orange, player->pos, player->dir);
 }
 
 internal inline void update_overlay_message(Overlay *overlay, f64 dt, V2f player_pos)
@@ -408,13 +426,24 @@ i32 main(void)
         return 1;
     }
 
-    init_game(&game);
-    init_font(&font, "fonts/CascadiaMono.ttf", 24);
+    init_game(&game, "Raycas");
+    init_font(&font, "fonts/CascadiaMono.ttf", 16);
 
-    Overlay overlay = { .state = OVERLAY_STATE_HIDDEN,
-                        .msg_format = "RESOLUTION: %dx%d, FPS: %d, POS: (%.0f, %.0f)" };
-    Player player = { .pos.x = 200, .pos.y = 200, .dir.x = 1, .dir.y = 0,
-                      .vel = 200, .rotation_vel = 60, .fov = M_PI_2, .radius = 6, .color = blue };
+    Overlay overlay = {
+        .state = OVERLAY_STATE_HIDDEN,
+        .msg_format = "RESOLUTION: %dx%d, FPS: %d, POS: (%.0f, %.0f)"
+    };
+    Player player = {
+        .pos.x = 200,
+        .pos.y = 200,
+        .dir.x = 1,
+        .dir.y = 0,
+        .vel = 200,
+        .rotation_vel = 60,
+        .fov = M_PI_2,
+        .radius = 6,
+        .color = blue
+    };
     Camera camera = { .radius = 6 };
     f64 delta_time = 0;
 
@@ -431,12 +460,15 @@ i32 main(void)
                 } break;
 
                 case SDL_KEYDOWN: {
+                    // TODO: another switch statement
                     if (is_key_pressed(SDLK_ESCAPE)) {
                         game.quit = true;
                     } else if (is_key_pressed(SDLK_o)) {
                         overlay.state = (overlay.state + 1) % _overlay_state_count;
                     } else if (is_key_pressed(SDLK_m)) {
                         game.show_map = !game.show_map;
+                    } else if (is_key_pressed(SDLK_c)) {
+                        game.show_crosshair = !game.show_crosshair;
                     }
                 } break;
             }
@@ -488,6 +520,7 @@ i32 main(void)
         }
 
         switch (overlay.state) {
+            default : {} break;
             case OVERLAY_STATE_HIDDEN: {
 
             } break;
@@ -501,9 +534,7 @@ i32 main(void)
                 SDL_FreeSurface(surface);
                 SDL_DestroyTexture(texture);
             } break;
-            case _overlay_state_count: {
-
-            } break;
+            case _overlay_state_count: {} break;
         }
 
         SDL_RenderPresent(game.renderer);
