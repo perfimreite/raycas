@@ -4,52 +4,52 @@
 #include "utils.h"
 #include "vector.h"
 
+#include <SDL2/SDL_pixels.h>
+#include <SDL2/SDL_rect.h>
 #include <stdbool.h>
-#include <stdio.h>
 
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_error.h>
-#include <SDL2/SDL_mouse.h>
-#include <SDL2/SDL_render.h>
 #include <SDL2/SDL_ttf.h>
 
 // none transparent colors
-global const SDL_Color black       = { .r = 0  , .g = 0  , .b = 0  , .a = 255 };
-global const SDL_Color white       = { .r = 255, .g = 255, .b = 255, .a = 255 };
-global const SDL_Color gray        = { .r = 127, .g = 127, .b = 127, .a = 255 };
-global const SDL_Color light_gray  = { .r = 63 , .g = 63 , .b = 63 , .a = 255 };
-global const SDL_Color red         = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
-global const SDL_Color green       = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
-global const SDL_Color blue        = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
-global const SDL_Color light_blue  = { .r = 191, .g = 191, .b = 255, .a = 255 };
-global const SDL_Color magenta     = { .r = 255, .g = 0  , .b = 255, .a = 255 };
-global const SDL_Color cyan        = { .r = 0  , .g = 255, .b = 255, .a = 255 };
-global const SDL_Color orange      = { .r = 255, .g = 165, .b = 0  , .a = 255 };
-global const SDL_Color yellow      = { .r = 255, .g = 255, .b = 0  , .a = 255 };
+global const SDL_Color black      = { .r = 0  , .g = 0  , .b = 0  , .a = 255 };
+global const SDL_Color white      = { .r = 255, .g = 255, .b = 255, .a = 255 };
+global const SDL_Color gray       = { .r = 127, .g = 127, .b = 127, .a = 255 };
+global const SDL_Color light_gray = { .r = 63 , .g = 63 , .b = 63 , .a = 255 };
+global const SDL_Color red        = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
+global const SDL_Color green      = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
+global const SDL_Color blue       = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
+global const SDL_Color light_blue = { .r = 191, .g = 191, .b = 255, .a = 255 };
+global const SDL_Color magenta    = { .r = 255, .g = 0  , .b = 255, .a = 255 };
+global const SDL_Color cyan       = { .r = 0  , .g = 255, .b = 255, .a = 255 };
+global const SDL_Color orange     = { .r = 255, .g = 165, .b = 0  , .a = 255 };
+global const SDL_Color yellow     = { .r = 255, .g = 255, .b = 0  , .a = 255 };
 
 // transparent colors
-global const SDL_Color black_trans = { .r = 0  , .g = 0  , .b = 0  , .a = 31 };
+global const SDL_Color transparent       = { .r = 0  , .g = 0  , .b = 0  , .a = 0   };
+global const SDL_Color black_transparent = { .r = 0  , .g = 0  , .b = 0  , .a = 127 };
 
 typedef struct {
-    u32 height;
-    u32 width;
+    u32 h;
+    u32 w;
 
     const char *path;
     TTF_Font *font;
 } Font;
 
-Font font = { 0 };
+Font font_16px = { 0 };
+Font font_24px = { 0 };
+Font font_32px = { 0 };
 
 internal void init_font(Font *font, const char *path, u32 height)
 {
     font->path = path;
-    font->height = height;
-    font->width = height / 2;
+    font->h = height;
+    font->w = height / 2;
 
     font->font = TTF_OpenFont(path, height);
     if (!font->font) {
-        fprintf(stderr, "ERROR: could not load font\n");
+        fprintf(stderr, "ERROR: could not load font: %s\n", path);
         exit(1);
     }
 }
@@ -66,6 +66,19 @@ typedef struct {
     const char *msg_format;
 } Overlay;
 
+internal Overlay_State next_overlay_state(Overlay_State state)
+{
+    return (state + 1) % _overlay_state_count;
+}
+
+internal inline void update_overlay_message(Overlay *overlay, f64 dt, V2f player_pos)
+{
+    u32 fps = 1 / dt;
+    sprintf(overlay->msg, overlay->msg_format,
+            WINDOW_WIDTH, WINDOW_HEIGHT,
+            fps, player_pos.x, player_pos.y);
+}
+
 typedef struct {
     V2f pos;
     V2f dir;
@@ -78,20 +91,25 @@ typedef struct {
     SDL_Color color;
 } Player;
 
-typedef struct {
-    V2f center;
-    V2f a;
-    V2f b;
-
-    u32 radius;
-} Camera;
+typedef enum {
+    GAME_STATE_GAME,
+    GAME_STATE_MAP,
+    GAME_STATE_MENU,
+    _game_state_count
+} Game_State;
 
 typedef struct {
     SDL_Window *window;
     SDL_Renderer *renderer;
     SDL_Event event;
 
-    bool show_map;
+    SDL_Rect minimap_dims;
+
+    V2f cursor;
+
+    i32 map_index;
+
+    Game_State state;
     bool show_crosshair;
     bool quit;
 } Game;
@@ -106,17 +124,55 @@ internal void init_game(Game *game, const char *title)
                                     WINDOW_WIDTH,
                                     WINDOW_HEIGHT,
                                     0);
-    game->show_map = false;
-    game->show_crosshair = true;
     if (!game->window) {
         fprintf(stderr, "ERROR: could not create window\n");
         exit(1);
     }
 
+    // SDL_SetHint(SDL_HINT_RENDER_LINE_METHOD, "3");
     game->renderer = SDL_CreateRenderer(game->window, -1, 0);
     if (!game->renderer) {
         fprintf(stderr, "ERROR: could not create renderer\n");
         exit(1);
+    }
+
+    game->minimap_dims = (SDL_Rect) {
+        .x = WINDOW_WIDTH * ((f32)3/4),
+        .y = 0,
+        .h = WINDOW_HEIGHT * ((f32)1/4),
+        .w = WINDOW_WIDTH * ((f32)1/4)
+    };
+
+    game->cursor = make_v2f(0, 0);
+
+    game->map_index = 0;
+
+    game->state = GAME_STATE_MENU;
+    game->show_crosshair = true;
+    game->quit = false;
+}
+
+internal void game_state_toggle_game()
+{
+    game.state = GAME_STATE_GAME;
+}
+
+internal void game_state_toggle_map()
+{
+    if (game.state == GAME_STATE_GAME) {
+        game.state = GAME_STATE_MAP;
+    } else if (game.state == GAME_STATE_MAP) {
+        game.state = GAME_STATE_GAME;
+    }
+}
+
+internal void game_state_toggle_menu()
+{
+    // TODO: Play sound when entering menu
+    if (game.state == GAME_STATE_GAME || game.state == GAME_STATE_MAP) {
+        game.state = GAME_STATE_MENU;
+    } else {
+        game.state = GAME_STATE_GAME;
     }
 }
 
@@ -128,15 +184,21 @@ internal void set_draw_color(SDL_Color color)
     }
 }
 
-internal void draw_walls(SDL_Color color)
+internal void draw_rect(SDL_Color color, SDL_Rect *rect)
 {
     set_draw_color(color);
 
+    if (SDL_RenderFillRect(game.renderer, rect) != 0) exit(1);
+    if (SDL_RenderDrawRect(game.renderer, rect) != 0) exit(1);
+}
+
+internal void draw_walls(SDL_Color color)
+{
     for (u32 y = 0; y < WINDOW_HEIGHT; y += CELL_SIZE) {
         for (u32 x = 0; x < WINDOW_WIDTH; x += CELL_SIZE) {
-            if (get_map_square(x, y) == WALL) {
-                SDL_Rect rect = { .x = x, .y = y, .h = CELL_SIZE, .w = CELL_SIZE };
-                if (SDL_RenderFillRect(game.renderer, &rect) != 0) exit(1);
+            if (is_wall(game.map_index, x, y)) {
+                SDL_Rect rect = { .x = x, .y = y, .w = CELL_SIZE, .h = CELL_SIZE };
+                draw_rect(color, &rect);
             }
         }
     }
@@ -162,26 +224,34 @@ internal void draw_grid(SDL_Color color)
     }
 }
 
-internal void draw_circle(SDL_Color color, V2f a, u32 radius)
+internal void draw_circle(SDL_Color color, V2f center, i32 radius, bool filled)
 {
-    f32 acc = radius * 2.0f;
-    f32 radius_sq = radius * radius;
+    // NOTE: Midpoint circle algorithm: https://www.youtube.com/watch?v=hpiILbMkF9w
 
-    for (i32 y = a.y - radius; y <= a.y + radius; y++) {
-        for (i32 x = a.x - radius; x <= a.x + radius; x++) {
-            V2f u = make_v2f(x, y);
-            i32 l =  v2f_square_len(v2f_sub(u, a));
+    for (i32 x = 0, y = -radius, p = -radius; x < -y; x++) {
+        if (p > 0) {
+            y += 1;
+            p += 2 * (x + y) + 1;
+        } else {
+            p += 2 * x + 1;
+        }
 
-            if (radius_sq - acc <= l && l <= radius_sq + acc) {
-                draw_line(color, a, u, 0);
-            }
+        if (filled) {
+            draw_line(color, make_v2f(center.x + x, center.y + y), make_v2f(center.x - x, center.y + y), 0);
+            draw_line(color, make_v2f(center.x + x, center.y - y), make_v2f(center.x - x, center.y - y), 0);
+            draw_line(color, make_v2f(center.x + y, center.y + x), make_v2f(center.x - y, center.y + x), 0);
+            draw_line(color, make_v2f(center.x + y, center.y - x), make_v2f(center.x - y, center.y - x), 0);
+        }  else {
+            SDL_RenderDrawPoint(game.renderer, center.x + x, center.y + y);
+            SDL_RenderDrawPoint(game.renderer, center.x - x, center.y + y);
+            SDL_RenderDrawPoint(game.renderer, center.x + x, center.y - y);
+            SDL_RenderDrawPoint(game.renderer, center.x - x, center.y - y);
+            SDL_RenderDrawPoint(game.renderer, center.x + y, center.y + x);
+            SDL_RenderDrawPoint(game.renderer, center.x - y, center.y + x);
+            SDL_RenderDrawPoint(game.renderer, center.x + y, center.y - x);
+            SDL_RenderDrawPoint(game.renderer, center.x - y, center.y - x);
         }
     }
-}
-
-internal void draw_player(Player *player)
-{
-    draw_circle(player->color, player->pos, player->radius);
 }
 
 typedef struct {
@@ -201,24 +271,24 @@ internal Intersect find_intersect(V2f pos, V2f dir)
     delta_dist.x = dir.x == 0 ? 1e30 : fabs(1.0f / dir.x);
     delta_dist.y = dir.y == 0 ? 1e30 : fabs(1.0f / dir.y);
 
-    V2f pos_tile_index = v2f_scale(pos, 1 / CELL_SIZE);
-    map.x = floor(pos_tile_index.x);
-    map.y = floor(pos_tile_index.y);
+    V2f tile_relative_pos = v2f_scale(pos, 1 / CELL_SIZE);
+    map.x = floor(tile_relative_pos.x);
+    map.y = floor(tile_relative_pos.y);
 
     if (dir.x < 0) {
         step.x = -1;
-        side_dist.x = (pos_tile_index.x - map.x) * delta_dist.x;
+        side_dist.x = (tile_relative_pos.x - map.x) * delta_dist.x;
     } else {
         step.x = 1;
-        side_dist.x = (map.x + 1.0f - pos_tile_index.x) * delta_dist.x;
+        side_dist.x = (map.x + 1.0f - tile_relative_pos.x) * delta_dist.x;
     }
 
     if (dir.y < 0) {
         step.y = -1;
-        side_dist.y = (pos_tile_index.y - map.y) * delta_dist.y;
+        side_dist.y = (tile_relative_pos.y - map.y) * delta_dist.y;
     } else {
         step.y = 1;
-        side_dist.y = (map.y + 1.0f - pos_tile_index.y) * delta_dist.y;
+        side_dist.y = (map.y + 1.0f - tile_relative_pos.y) * delta_dist.y;
     }
 
     Intersect intersect = { 0 };
@@ -234,184 +304,255 @@ internal Intersect find_intersect(V2f pos, V2f dir)
             intersect.vertical = true;
         }
 
-        if (is_wall_tile(map.x, map.y)) {
-            break;
-        }
-
         if (is_perim_tile(map.x, map.y)) {
             intersect.perim = true;
             break;
         }
+        if (is_wall_tile(game.map_index, map.x, map.y)) {
+            break;
+        }
     }
 
-    intersect.perp_wall_dist = intersect.vertical ? (side_dist.y - delta_dist.y) : (side_dist.x - delta_dist.x);
-    intersect.perp_wall_dist *= CELL_SIZE;
+    intersect.perp_wall_dist =
+        (intersect.vertical ? (side_dist.y - delta_dist.y) : (side_dist.x - delta_dist.x)) * CELL_SIZE;
     intersect.pos = v2f_add(pos, v2f_scale(dir, intersect.perp_wall_dist));
     return intersect;
 }
 
-// NOTE: old approach checks every pixle in a line following player.dir
-// this is very slow...
-// internal Intersect find_intersect(V2f a, V2f b)
-// {
-//     V2f u = v2f_sub(b, a);
-//     f32 l = v2f_len(u);
-//
-//     for (i32 i = 0;; i++) {
-//         f32 t = i / l;
-//         f32 x = a.x + t * u.x;
-//         f32 y = a.y + t * u.y;
-//
-//         V2f pos = make_v2f(x, y);
-//         draw_circle(orange, pos, 1);
-//         Intersect intersect = { .pos = pos, .vertical = false, .wall = false };
-//
-//         // check for oob
-//         if (0 > x || x >= WINDOW_WIDTH) {
-//             intersect.vertical = true;
-//             intersect.wall = true;
-//             return intersect;
-//         }
-//         if (0 > y || y >= WINDOW_HEIGHT) {
-//             intersect.wall = true;
-//             return intersect;
-//         }
-//
-//         if ((i32)x % (i32)CELL_SIZE == 0 && (is_wall(x, y) || (u.x < 0 && is_wall(x - 1, y)))) {
-//             intersect.vertical = true;
-//             return intersect;
-//         }
-//         if ((i32)y % (i32)CELL_SIZE == 0 && (is_wall(x, y) || (u.y < 0 && is_wall(x, y - 1)))) {
-//             return intersect;
-//         }
-//     }
-// }
-
-internal void draw_intersect(SDL_Color color, V2f pos, V2f dir)
+internal void draw_crosshair(void)
 {
-    Intersect intersect = find_intersect(pos, dir);
-    u32 radius = 4;
-    draw_circle(color, intersect.pos, radius);
+    i32 l = 5;
+    draw_line(white, make_v2f(WINDOW_CENTER_X, WINDOW_CENTER_Y - l), make_v2f(WINDOW_CENTER_X, WINDOW_CENTER_Y + l), 0);
+    draw_line(white, make_v2f(WINDOW_CENTER_X - l, WINDOW_CENTER_Y), make_v2f(WINDOW_CENTER_X + l, WINDOW_CENTER_Y), 0);
 }
 
-internal void draw_3d_view(Player *player, Camera *camera)
+internal void draw_3d_view(Player *player)
 {
-    f32 theta = player->fov;
-    f32 half_theta = theta / 2.0f;
-    f32 angle_step = theta / (WINDOW_WIDTH - 1);
+    // TODO: surely we can shorten this and improve performance
 
-    // line equation: ax+by+c
-    Line line = line_from_points(camera->a, camera->b);
-
-    f32 angle = -half_theta;
-    u32 buffer_x = 0;
-    for (; angle <= half_theta; angle += angle_step, buffer_x++) {
-        V2f curr_dir = v2f_rotate(player->dir, angle);
+    f32 angle_curr  = -player->fov / 2.0f;
+    f32 angle_end   =  player->fov / 2.0f;
+    f32 angle_step  =  player->fov / (WINDOW_WIDTH - 1);
+    for (u32 buffer_x; angle_curr <= angle_end; angle_curr += angle_step, buffer_x++) {
+        V2f curr_dir = v2f_rotate(player->dir, angle_curr);
         Intersect intersect = find_intersect(player->pos, curr_dir);
 
-        #define WALL_HEIGHT_MULTIPLIER 32
-        f32 perp_wall_dist = distance_point_to_line(intersect.pos, line);
-        i32 wall_height = WINDOW_HEIGHT * WALL_HEIGHT_MULTIPLIER / perp_wall_dist;
+        f32 wall_height = WINDOW_HEIGHT * WALL_HEIGHT_MULTIPLIER / intersect.perp_wall_dist;
 
-        i32 wall_top    = CLAMP((-wall_height / 2) + (WINDOW_HEIGHT / 2), 0, WINDOW_HEIGHT - 1);
-        i32 wall_bottom = CLAMP(( wall_height / 2) + (WINDOW_HEIGHT / 2), 0, WINDOW_HEIGHT - 1);
+        f32 wall_top    = CLAMP((-wall_height / 2.0f) + (WINDOW_HEIGHT / 2.0f), 0.0f, WINDOW_HEIGHT - 1.0f);
+        f32 wall_bottom = CLAMP(( wall_height / 2.0f) + (WINDOW_HEIGHT / 2.0f), 0.0f, WINDOW_HEIGHT - 1.0f);
 
-        // NOTE: light gray lines in dark gray walls are probably caused by hitting
-        // point that is both horisontal and vertical and one being prioritized
-        SDL_Color color;
-        if (intersect.perim) {
-            color = black;
-        } else {
-            color = intersect.vertical ? gray : light_gray;
-        }
+        SDL_Color wall_color = intersect.perim ? black : (intersect.vertical ? gray : light_gray);
 
-        V2f wall_start = make_v2f(buffer_x, wall_top);
-        V2f wall_end   = make_v2f(buffer_x, wall_bottom);
+        V2f window_start = make_v2f(buffer_x, 0);
+        V2f wall_start   = make_v2f(buffer_x, wall_top);
+        V2f wall_end     = make_v2f(buffer_x, wall_bottom);
+        // V2f window_end   = make_v2f(buffer_x, WINDOW_HEIGHT);
 
-        draw_line(light_blue, make_v2f(buffer_x, 0), wall_start, 0);
-        draw_line(color,      wall_start, wall_end, 0);
-        draw_line(green,      wall_end, make_v2f(buffer_x, WINDOW_HEIGHT), 0);
+        draw_line(light_blue, window_start, wall_start, 0);
+        draw_line(wall_color, wall_start,   wall_end,   0);
+        // NOTE: Not drawing these lines saves ~100 FPS
+        // draw_line(green,      wall_end,     window_end, 0);
     }
 
     if (game.show_crosshair) {
-        f32 cx = WINDOW_WIDTH / 2.0f;
-        f32 cy = WINDOW_HEIGHT / 2.0f;
-        i32 l = 5.0f;
-        draw_line(white,
-                  make_v2f(cx, cy - l),
-                  make_v2f(cx, cy + l),
-                  0);
-        draw_line(white,
-                  make_v2f(cx - l, cy),
-                  make_v2f(cx + l, cy),
-                  0);
+        draw_crosshair();
     }
 }
 
-internal void draw_player_fov(Player *player, Camera *camera, u32 beam_spread)
+internal void draw_player(Player *player)
 {
-    f32 theta = player->fov;
-    f32 half_theta = theta / 2.0f;
-    f32 step = theta / (WINDOW_WIDTH - 1);
+    draw_circle(player->color, player->pos, player->radius, true);
+}
 
-    Line line = line_from_points(camera->a, camera->b);
+internal void draw_player_fov(SDL_Color color, Player *player, u32 beam_spread)
+{
+    f32 angle_curr  = -player->fov / 2.0f;
+    f32 angle_end   =  player->fov / 2.0f;
+    f32 angle_step  =  player->fov / (WINDOW_WIDTH - 1) * beam_spread;
+    for (u32 buffer_x; angle_curr <= angle_end; angle_curr += angle_step, buffer_x++) {
+        V2f curr_dir = v2f_rotate(player->dir, angle_curr);
+        Intersect intersect = find_intersect(player->pos, curr_dir);
 
-    f32 angle = -half_theta;
-    u32 wall_x = 0;
-    for (; angle <= half_theta; angle += step, wall_x++) {
-        if (wall_x % beam_spread == 0) {
-            // NOTE: from old find_intersect()
-            // V2f u = v2f_add(player->pos, v2f_rotate(player->dir, angle));
-            // Intersect intersect = find_intersect(player->pos, u);
-
-            // new find_intersect() takes pos and dir, not pos and pos+dir)
-            V2f dir = v2f_rotate(player->dir, angle);
-            Intersect intersect = find_intersect(player->pos, dir);
-
-            f32 perp_wall_dist = distance_point_to_line(intersect.pos, line);
-
-            // NOTE: only for debug
-#if 0
-            draw_circle(cyan, intersect.pos, 1);
-            draw_line(orange, player->pos, intersect.pos, 0);
-            draw_line(yellow, intersect.pos, v2f_sub(intersect.pos, v2f_scale(player->dir, perp_wall_dist)), 0);
-            if (wall_x == 0 || wall_x == WINDOW_WIDTH - 1) {
-                draw_line(purple, player->pos, intersect.pos, 1);
-            }
-#endif
-        }
+        draw_line(color, player->pos, intersect.pos, 0);
     }
 }
 
-internal void draw_map(Player *player, Camera *camera)
+internal void draw_map(Player *player)
 {
     draw_walls(gray);
     draw_grid(black);
 
-    // draw player
     draw_player(player);
-
-    // draw camera
-    draw_circle(black, camera->center, camera->radius);
-    draw_line(magenta, player->pos, camera->center, 1);
-    draw_line(blue, camera->a, camera->b, 1);
-    draw_line(red, player->pos, camera->a, 1);
-    draw_line(red, player->pos, camera->b, 1);
-    draw_player_fov(player, camera, 4);
-    draw_intersect(orange, player->pos, player->dir);
+    draw_player_fov(orange, player, 8);
 }
 
-internal inline void update_overlay_message(Overlay *overlay, f64 dt, V2f player_pos)
+internal void minimap_draw_walls(SDL_Color color, f32 scale)
 {
-    u32 fps = 1 / dt;
-    sprintf(overlay->msg, overlay->msg_format,
-            WINDOW_WIDTH, WINDOW_HEIGHT,
-            fps, player_pos.x, player_pos.y);
+    for (u32 y = 0; y < WINDOW_HEIGHT; y += CELL_SIZE) {
+        for (u32 x = 0; x < WINDOW_WIDTH; x += CELL_SIZE) {
+            if (is_wall(game.map_index, x, y)) {
+                SDL_Rect rect = {
+                    .x = x * scale + game.minimap_dims.x,
+                    .y = y * scale + game.minimap_dims.y,
+                    .w = CELL_SIZE * scale,
+                    .h = CELL_SIZE * scale
+                };
+                draw_rect(color, &rect);
+            }
+        }
+    }
+}
+
+internal void minimap_draw_grid(SDL_Color color, f32 scale)
+{
+    f32 scaled_cell_size = CELL_SIZE * scale;
+
+    for (i32 y = game.minimap_dims.y + scaled_cell_size; y < game.minimap_dims.y + game.minimap_dims.h; y += scaled_cell_size) {
+        draw_line(color, make_v2f(game.minimap_dims.x, y), make_v2f(game.minimap_dims.x + game.minimap_dims.w, y), 0);
+    }
+
+    for (i32 x = game.minimap_dims.x + scaled_cell_size ; x < game.minimap_dims.x + game.minimap_dims.w; x += scaled_cell_size) {
+        draw_line(color, make_v2f(x, game.minimap_dims.y), make_v2f(x, game.minimap_dims.y + game.minimap_dims.h), 0);
+    }
+}
+
+internal void draw_minimap(Player *player) {
+    f64 scale = (f64)game.minimap_dims.w / WINDOW_WIDTH;
+
+    // check that the horisontal and vertical scale are equal
+    {
+        f64 scale_vertical = (f64)game.minimap_dims.h / WINDOW_HEIGHT;
+        assert(scale == scale_vertical && "Horisontal and vertical scale should be equal in the minipap");
+    }
+
+    draw_rect(green, &game.minimap_dims);
+
+    minimap_draw_walls(gray, scale);
+    minimap_draw_grid(black, scale);
+
+    V2f player_minimap_pos = v2f_add(v2f_scale(player->pos, scale), make_v2f(game.minimap_dims.x, game.minimap_dims.y));
+    draw_circle(blue, player_minimap_pos, 2, true);
+}
+
+internal void clear_backbuffer(SDL_Color bg)
+{
+    set_draw_color(bg);
+    SDL_RenderClear(game.renderer);
+}
+
+typedef struct {
+    const char *text;
+    Font font;
+    bool pressed;
+
+    SDL_Rect dims;
+    SDL_Color bg;
+    SDL_Color fg;
+    SDL_Color border;
+} Button;
+
+internal Button *init_button() {
+    return NULL;
+}
+
+typedef struct {
+    Button *items;
+    u32 count;
+    u32 capacity;
+} Buttons;
+
+internal void buttons_append(Buttons *buttons, Button button) {
+    buttons->items[buttons->count++] = button;
+    assert(buttons->count <= buttons->capacity);
+}
+
+internal bool button_clicked(Button *button, V2f click) {
+    return false;
+}
+
+internal void draw_button(Button *button) {
+    draw_rect(button->bg, &button->dims);
+    SDL_Surface *surface = TTF_RenderUTF8_Shaded(button->font.font, button->text, button->fg, button->bg);
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(game.renderer, surface);
+    const SDL_Rect rect = {
+        // TODO: This should be a seperate function. Center text in button rect
+        .x = button->dims.x + (button->dims.w - button->font.w * strlen(button->text)) / 2,
+
+        .y = button->dims.y + (button->dims.h - button->font.h) / 2,
+        .w = button->font.w * strlen(button->text),
+        .h = button->font.h
+    };
+
+    SDL_RenderCopy(game.renderer, texture, NULL, &rect);
+
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(texture);
+}
+
+internal void draw_menu(Buttons buttons)
+{
+    for (u32 i = 0; i < buttons.count; i++) {
+        draw_button(&buttons.items[i]);
+    }
+}
+
+internal void draw_game(Player *player, Overlay *overlay, Buttons buttons)
+{
+    switch (game.state) {
+        default: {} break;
+        case GAME_STATE_GAME: {
+            clear_backbuffer(green);
+            draw_3d_view(player);
+            draw_minimap(player);
+        } break;
+        case GAME_STATE_MAP: {
+            clear_backbuffer(green);
+            draw_map(player);
+        } break;
+        case GAME_STATE_MENU: {
+            clear_backbuffer(white);
+            draw_menu(buttons);
+        } break;
+        case _game_state_count: {} break;
+    }
+
+    switch (overlay->state) {
+       default : {} break;
+       case OVERLAY_STATE_HIDDEN: {} break;
+       case OVERLAY_STATE_SHOWN: {
+           // NOTE: can change to wrapped font rendering if msg gets too long
+           // WARNING: this code block cannot be factored out into a seperate function.
+           // doing so will cause draw_3d_view() to not draw anything *unless* a print statement
+           // including both a character and newline appear above the call to draw_3d_view()
+           SDL_Surface *surface = TTF_RenderUTF8_Shaded(font_16px.font, overlay->msg, white, black_transparent);
+           SDL_Texture *texture = SDL_CreateTextureFromSurface(game.renderer, surface);
+           const SDL_Rect rect = { .x = 0, .y = 0, .w = font_16px.w * strlen(overlay->msg), .h = font_16px.h };
+
+           SDL_RenderCopy(game.renderer, texture, NULL, &rect);
+
+           SDL_FreeSurface(surface);
+           SDL_DestroyTexture(texture);
+        } break;
+        case _overlay_state_count: {} break;
+    }
+
+    SDL_RenderPresent(game.renderer);
 }
 
 internal inline bool is_key_pressed(i32 key)
 {
     return game.event.key.keysym.sym == key;
+}
+
+internal inline void player_rotate_clockwise(Player *player, f64 dt)
+{
+    player->dir = v2f_rotate(player->dir, radians_from_degrees(player->rotation_vel) * dt);
+}
+
+internal inline void player_rotate_counterclockwise(Player *player, f64 dt)
+{
+    player->dir = v2f_rotate(player->dir, radians_from_degrees(-player->rotation_vel) * dt);
 }
 
 i32 main(void)
@@ -427,11 +568,13 @@ i32 main(void)
     }
 
     init_game(&game, "Raycas");
-    init_font(&font, "fonts/CascadiaMono.ttf", 16);
+    init_font(&font_16px, "fonts/CascadiaMono.ttf", 16);
+    init_font(&font_24px, "fonts/CascadiaMono.ttf", 24);
+    init_font(&font_32px, "fonts/CascadiaMono.ttf", 32);
 
     Overlay overlay = {
         .state = OVERLAY_STATE_HIDDEN,
-        .msg_format = "RESOLUTION: %dx%d, FPS: %d, POS: (%.0f, %.0f)"
+        .msg_format = "RESOLUTION:%dx%d FPS:%d POS:(%.2f, %.2f)"
     };
     Player player = {
         .pos.x = 200,
@@ -439,18 +582,59 @@ i32 main(void)
         .dir.x = 1,
         .dir.y = 0,
         .vel = 200,
-        .rotation_vel = 60,
+        .rotation_vel = 120,
         .fov = M_PI_2,
         .radius = 6,
         .color = blue
     };
-    Camera camera = { .radius = 6 };
-    f64 delta_time = 0;
+
+    Button start_button = {
+        .text = "START",
+        .font = font_32px,
+        .pressed = false,
+        .dims = {
+            .x = WINDOW_CENTER_X - 100,
+            .y = WINDOW_CENTER_Y -  40 - 80,
+            .w = 200,
+            .h = 80 
+        },
+        .bg = blue,
+        .fg = white,
+        .border = black
+    };
+
+    Button quit_button = {
+        .text = "QUIT",
+        .font = font_32px,
+        .pressed = false,
+        .dims = {
+            .x = WINDOW_CENTER_X - 100,
+            .y = WINDOW_CENTER_Y -  40 + 80,
+            .w = 200,
+            .h = 80 
+        },
+        .bg = red,
+        .fg = white,
+        .border = black
+    };
+
+    Buttons buttons = {
+        .items = malloc(32 * sizeof(Button)),
+        .count = 0,
+        .capacity = 32
+    };
+
+    buttons_append(&buttons, start_button);
+    buttons_append(&buttons, quit_button);
+
+    f64 frame_start      = 0;
+    f64 frame_end        = 0;
+    f64 frame_delta_time = 0;
 
     const u8 *keystate = SDL_GetKeyboardState(NULL);
 
     while (!game.quit) {
-        f64 begin = time_in_seconds();
+        frame_start = time_in_seconds();
 
         // handle events
         while (SDL_PollEvent(&game.event)) {
@@ -459,93 +643,92 @@ i32 main(void)
                     game.quit = true;
                 } break;
 
+                case SDL_MOUSEBUTTONDOWN: {
+                } break;
+
                 case SDL_KEYDOWN: {
-                    // TODO: another switch statement
-                    if (is_key_pressed(SDLK_ESCAPE)) {
-                        game.quit = true;
-                    } else if (is_key_pressed(SDLK_o)) {
-                        overlay.state = (overlay.state + 1) % _overlay_state_count;
+                    // if (is_key_pressed(SDLK_ESCAPE)) {
+                    //     game.quit = true;
+                    // }
+                    if (is_key_pressed(SDLK_o)) {
+                        overlay.state = next_overlay_state(overlay.state);
                     } else if (is_key_pressed(SDLK_m)) {
-                        game.show_map = !game.show_map;
+                        game_state_toggle_map();
+                    }  else if (is_key_pressed(SDLK_ESCAPE)) {
+                        game_state_toggle_menu();
                     } else if (is_key_pressed(SDLK_c)) {
                         game.show_crosshair = !game.show_crosshair;
+                    } else if (is_key_pressed(SDLK_n)) {
+                        game.map_index = next_map_index(game.map_index);
                     }
                 } break;
             }
         }
 
+        // Get cursor positon
+        SDL_GetMouseState((i32 *)(&game.cursor.x), (i32 *)(&game.cursor.y));
+
+        if (game.state == GAME_STATE_MENU) {
+            if (SDL_GetMouseState((i32 *)&game.cursor.x, (i32 *)&game.cursor.y) & SDL_BUTTON_LMASK) {
+                for (i32 i = 0; i < buttons.count; i++) {
+                    SDL_FPoint p = {
+                        .x = game.cursor.x,
+                        .y = game.cursor.y
+                    };
+                    SDL_FRect r = {
+                        .x = buttons.items[i].dims.x,
+                        .y = buttons.items[i].dims.y,
+                        .w = buttons.items[i].dims.w,
+                        .h = buttons.items[i].dims.h
+                    };
+                    if (SDL_PointInFRect(&p, &r)) {
+                        buttons.items[i].pressed = true;
+                    }
+                }
+            }
+        }
+
+        if (buttons.items[0].pressed) {
+            printf("pressed start");
+        }
+
         // update player position
-        {
+        if (game.state != GAME_STATE_MENU) {
             V2f old_pos = player.pos;
 
             if (keystate[SDL_SCANCODE_W]) {
-                player.pos = v2f_add(player.pos, v2f_scale(player.dir, delta_time * player.vel));
+                player.pos = v2f_add(player.pos, v2f_scale(player.dir, frame_delta_time * player.vel));
                 if (is_perim(player.pos.x, player.pos.y) ||
-                    is_wall(player.pos.x, player.pos.y)) {
+                    is_wall(game.map_index, player.pos.x, player.pos.y)) {
                     player.pos = old_pos;
                 }
             }
             if (keystate[SDL_SCANCODE_A]) {
-                player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * delta_time);
+                player_rotate_counterclockwise(&player, frame_delta_time);
             }
             if (keystate[SDL_SCANCODE_S]) {
-                player.pos = v2f_sub(player.pos, v2f_scale(player.dir, delta_time * player.vel));
+                player.pos = v2f_sub(player.pos, v2f_scale(player.dir, frame_delta_time * player.vel));
                 if (is_perim(player.pos.x, player.pos.y) ||
-                    is_wall(player.pos.x, player.pos.y)) {
+                    is_wall(game.map_index, player.pos.x, player.pos.y)) {
                     player.pos = old_pos;
                 }
             }
             if (keystate[SDL_SCANCODE_D]) {
-                player.dir = v2f_rotate(player.dir, radians_from_degrees(player.rotation_vel) * delta_time);
+                player_rotate_clockwise(&player, frame_delta_time);
             }
         }
 
-        // compute camera coordinates
-        {
-            V2f dir = v2f_scale(player.dir, CELL_SIZE);
-
-            camera.center = v2f_add(player.pos, dir);
-            camera.a = v2f_add(camera.center, v2f_scale(v2f_normal(dir), -1));
-            camera.b = v2f_add(camera.center, v2f_normal(dir));
+        //update overlay
+        if (overlay.state == OVERLAY_STATE_SHOWN) {
+            update_overlay_message(&overlay, frame_delta_time, player.pos);
         }
 
         // rendering
-        set_draw_color(white);
-        SDL_RenderClear(game.renderer);
+        draw_game(&player, &overlay, buttons);
 
-        if (game.show_map) {
-            draw_map(&player, &camera);
-        } else {
-            draw_3d_view(&player, &camera);
-        }
-
-        switch (overlay.state) {
-            default : {} break;
-            case OVERLAY_STATE_HIDDEN: {
-
-            } break;
-            case OVERLAY_STATE_SHOWN: { 
-                SDL_Surface *surface = TTF_RenderText_Shaded(font.font, overlay.msg, black, black_trans);
-                SDL_Texture *texture = SDL_CreateTextureFromSurface(game.renderer, surface);
-                const SDL_Rect rect = { .x = 0, .y = 0, .w = font.width * strlen(overlay.msg), .h = font.height };
-
-                SDL_RenderCopy(game.renderer, texture, NULL, &rect);
-
-                SDL_FreeSurface(surface);
-                SDL_DestroyTexture(texture);
-            } break;
-            case _overlay_state_count: {} break;
-        }
-
-        SDL_RenderPresent(game.renderer);
-
-        // compute delta time and update overlay
-        f64 now = time_in_seconds();
-        delta_time = now - begin;
-
-        if (overlay.state == OVERLAY_STATE_SHOWN) {
-            update_overlay_message(&overlay, delta_time, player.pos);
-        }
+        // compute delta time
+        frame_end = time_in_seconds();
+        frame_delta_time = frame_end - frame_start;
     }
 
     return 0;

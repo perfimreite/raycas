@@ -1,45 +1,70 @@
 #include "map.h"
 
-global i32 map[ROWS][COLS] = {
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
-    {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0},
-    {0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
-    {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+internal i32 map[MAP_COUNT][ROWS][COLS] = {
+    {
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
+        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0},
+        {0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+    },
+    {
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
+        {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1},
+    }
 };
 
-// FIXME: indexing into an array without checking max size.
-
-i32 get_map_square(i32 x, i32 y)
+i32 next_map_index(i32 map_index)
 {
-    return map[y/(i32)CELL_SIZE][x/(i32)CELL_SIZE];
+    return (map_index + 1) % MAP_COUNT;
 }
 
-bool is_wall(i32 x, i32 y)
+Map_Square_Kind get_map_square(i32 map_index, f32 x, f32 y)
 {
-    return get_map_square(x, y) == WALL;
+    i32 cy = y / CELL_SIZE;
+    i32 cx = x / CELL_SIZE;
+    assert(cy >= 0);
+    assert(cx >= 0);
+    return map[map_index][cy][cx];
 }
 
-bool is_perim(i32 x, i32 y)
+bool is_wall(i32 map_index, f32 x, f32 y)
 {
-    return (0 > y || y >= WINDOW_HEIGHT) || (0 > x || x >= WINDOW_WIDTH);
+    return get_map_square(map_index, x, y) == WALL;
 }
 
-i32 get_map_square_by_tile(i32 x, i32 y)
+bool is_perim(f32 x, f32 y)
 {
-    return map[y][x];
+    return (0.0f > y || y >= WINDOW_HEIGHT) || (0.0f > x || x >= WINDOW_WIDTH);
 }
 
-bool is_wall_tile(i32 x, i32 y)
+Map_Square_Kind get_map_square_by_tile(i32 map_index, i32 x, i32 y)
 {
-    return get_map_square_by_tile(x, y) == WALL;
+    assert(y >= 0);
+    assert(x >= 0);
+    return map[map_index][y][x];
+}
+
+bool is_wall_tile(i32 map_index, i32 x, i32 y)
+{
+    return get_map_square_by_tile(map_index, x, y) == WALL;
 }
 
 bool is_perim_tile(i32 x, i32 y)

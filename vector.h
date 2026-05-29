@@ -10,7 +10,6 @@ typedef struct {
     f32 y;
 } V2f;
 
-extern V2f zero_vector;
 bool v2f_zero(V2f a);
 bool v2f_eq(V2f a, V2f b);
 
@@ -33,6 +32,4 @@ typedef struct {
     f32 c;
 } Line;
 
-Line line_from_points(V2f a, V2f b);
-f32 distance_point_to_line(V2f p, Line l);
 #endif // VECTOR_H

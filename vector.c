@@ -81,17 +81,3 @@ f32 v2f_dot_product(V2f a, V2f b)
     return a.x * b.x + a.y * b.y;
 }
 
-Line line_from_points(V2f a, V2f b)
-{
-    f32 la = a.y - b.y;
-    f32 lb = b.x - a.x;
-    f32 lc = a.x * b.y - b.x * a.y;
-
-    return (Line){ .a = la, .b = lb, .c = lc };
-}
-
-f32 distance_point_to_line(V2f p, Line l)
-{
-    return fabs(l.a * p.x + l.b * p.y + l.c) / sqrt(l.a * l.a + l.b * l.b);
-}
-
