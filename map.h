@@ -11,7 +11,7 @@ typedef enum {
     WALL
 } Map_Square_Kind;
 
-i32 next_map_index(i32 map_index);
+i32 next_map_index();
 
 Map_Square_Kind get_map_square(i32 map_index, f32 x, f32 y);
 bool is_wall(i32 map_index, f32 x, f32 y);

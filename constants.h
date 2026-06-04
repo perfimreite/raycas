@@ -24,5 +24,7 @@ static_assert(WINDOW_WIDTH / COLS == WINDOW_HEIGHT / ROWS);
 
 #define MAP_COUNT 2
 
+#define FONT_FILE "fonts/CascadiaMono.ttf"
+
 #endif // CONSTANTS_H
 
