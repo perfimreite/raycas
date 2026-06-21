@@ -26,10 +26,4 @@ f32 v2f_square_len(V2f a);
 f32 v2f_len(V2f a);
 f32 v2f_dot_product(V2f a, V2f b);
 
-typedef struct {
-    f32 a;
-    f32 b;
-    f32 c;
-} Line;
-
 #endif // VECTOR_H

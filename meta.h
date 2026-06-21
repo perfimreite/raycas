@@ -31,4 +31,6 @@ typedef double   f64;
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define CLAMP(x, min, max) MIN(MAX((x), (min)), (max))
 
+#define ARRAY_LEN(a) (sizeof((a)) / sizeof((a)[0]))
+
 #endif // META_H

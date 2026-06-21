@@ -1,19 +1,16 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Wpedantic
 
-run: build/main
-	build/main
+all: main main_hd
 
-build/main: main.c constants.h map.c utils.c vector.c game.c
-	$(CC) $(CFLAGS) main.c game.c vector.c map.c utils.c -I/usr/include/SDL2 -lSDL2 -lSDL2main -lSDL2_ttf -lm -o build/main -g
+main: main.c game.c map.c utils.c vector.c constants.h
+	$(CC) $(CFLAGS) main.c game.c map.c utils.c vector.c -I/usr/include/SDL2 -lSDL2 -lSDL2main -lSDL2_ttf -lm -o main -g
 
-run-high-res: build/main_high_res
-	build/main_high_res
-
-build/main_high_res: main.c constants.h map.c utils.c vector.c
-	$(CC) $(CFLAGS) -DHIGH_RESOLUTION=1 main.c vector.c map.c utils.c -I/usr/include/SDL2 -lSDL2 -lSDL2main -lSDL2_ttf -lm -o build/main_high_res -g
+main_hd: main.c game.c map.c utils.c vector.c constants.h
+	$(CC) $(CFLAGS) -DHIGH_RESOLUTION main.c game.c map.c utils.c vector.c -I/usr/include/SDL2 -lSDL2 -lSDL2main -lSDL2_ttf -lm -o main_hd -g
 
 clean:
-	rm -rf build/main
-	rm -rf build/main_high_res
+	rm -rf main
+	rm -rf main_hd
+	rm -rf *.o
 

@@ -1,5 +1,3 @@
-#include "constants.h"
-#include "map.h"
 #include "meta.h"
 #include "utils.h"
 #include "vector.h"
@@ -9,26 +7,8 @@
 
 #include <SDL2/SDL_pixels.h>
 #include <SDL2/SDL_rect.h>
-#include <SDL2/SDL_render.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
-
-internal void val_error(i32 code)
-{
-    if (code < 0) {
-        fprintf(stderr, "SDL ERROR: %s\n", SDL_GetError());
-        exit(1);
-    }
-}
-
-internal void *ptr_error(void *code)
-{
-    if (!code) {
-        fprintf(stderr, "SDL ERROR: %s\n", SDL_GetError());
-        exit(1);
-    }
-    return code;
-}
 
 typedef struct {
     const char *path;
@@ -36,8 +16,13 @@ typedef struct {
     TTF_Font *font;
 } Font;
 
-Font *fonts = NULL;
-global u32 font_count = 0;
+typedef struct {
+    Font *items;
+    u64 count;
+    u64 capacity;
+} Fonts;
+
+Fonts fonts = { 0 };
 
 internal Font font_init(const char *path, i32 ptsize)
 {
@@ -50,30 +35,50 @@ internal Font font_init(const char *path, i32 ptsize)
 
 internal Font *get_font(i32 ptsize)
 {
-    for (u32 i = 0; i < font_count; i++) {
-        if (fonts[i].ptsize == ptsize) {
-            return &fonts[i];
+    assert(fonts.count <= fonts.capacity);
+
+    if (fonts.capacity == 0) {
+        fonts.capacity = MAX_FONT_COUNT;
+        fonts.items = malloc(fonts.capacity * sizeof(Font));
+    }
+
+    for (u32 i = 0; i < fonts.count; i++) {
+        if (fonts.items[i].ptsize == ptsize) {
+            return &fonts.items[i];
         }
     }
 
-    fonts[font_count++] = font_init(FONT_FILE, ptsize);
-    return &fonts[font_count-1];
+    fonts.items[fonts.count++] = font_init(FONT_FILE, ptsize);
+    return &fonts.items[fonts.count-1];
 }
-
-// global Font font_16px = { 0 };
-// global Font font_24px = { 0 };
-// global Font font_32px = { 0 };
 
 global SDL_Window *window = NULL;
 global SDL_Renderer *renderer = NULL;
 
-internal u32 get_mouse_state(void)
+internal void val_err(i32 code)
+{
+    if (code < 0) {
+        fprintf(stderr, "SDL ERROR: %s\n", SDL_GetError());
+        exit(1);
+    }
+}
+
+internal void *ptr_err(void *code)
+{
+    if (!code) {
+        fprintf(stderr, "SDL ERROR: %s\n", SDL_GetError());
+        exit(1);
+    }
+    return code;
+}
+
+u32 platform_get_mouse_state(V2f *mouse_pos)
 {
     i32 x;
     i32 y;
     u32 mouse_button_state = SDL_GetMouseState(&x, &y);
-    // game.mouse.x = x;
-    // game.mouse.y = y;
+    mouse_pos->x = x;
+    mouse_pos->y = y;
     return mouse_button_state;
 }
 
@@ -84,6 +89,14 @@ internal SDL_Color translate_color(Color color)
         .g = color.g,
         .b = color.b,
         .a = color.a
+    };
+}
+
+internal SDL_Point translate_point(V2f point)
+{
+    return (SDL_Point) {
+        .x = point.x,
+        .y = point.y
     };
 }
 
@@ -100,24 +113,24 @@ internal SDL_Rect translate_rect(Rect rect)
 void platform_draw_point(Color color, V2f a)
 {
     SDL_Color sdl_color = translate_color(color);
-    val_error(SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a));
-    val_error(SDL_RenderDrawPoint(renderer, a.x, a.y));
+    val_err(SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a));
+    val_err(SDL_RenderDrawPoint(renderer, a.x, a.y));
 }
 
 void platform_draw_line(Color color, V2f a, V2f b)
 {
     SDL_Color sdl_color = translate_color(color);
-    val_error(SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a));
-    val_error(SDL_RenderDrawLine(renderer, a.x, a.y, b.x, b.y));
+    val_err(SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a));
+    val_err(SDL_RenderDrawLine(renderer, a.x, a.y, b.x, b.y));
 }
 
 void platform_draw_rect(Color color, Rect rect)
 {
     SDL_Color sdl_color = translate_color(color);
-    val_error(SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a));
+    val_err(SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a));
     SDL_Rect sdl_rect = translate_rect(rect);
-    val_error(SDL_RenderFillRect(renderer, &sdl_rect));
-    val_error(SDL_RenderDrawRect(renderer, &sdl_rect));
+    val_err(SDL_RenderFillRect(renderer, &sdl_rect));
+    val_err(SDL_RenderDrawRect(renderer, &sdl_rect));
 }
 
 void platform_draw_circle(Color color, V2f center, i32 radius, bool filled)
@@ -151,8 +164,30 @@ void platform_draw_circle(Color color, V2f center, i32 radius, bool filled)
 
 void platform_clear_backbuffer(Color color)
 {
-    val_error(SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a));
-    val_error(SDL_RenderClear(renderer));
+    val_err(SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a));
+    val_err(SDL_RenderClear(renderer));
+}
+
+V2f platform_get_text_dims(i32 ptsize, const char *text)
+{
+    Font *font = get_font(ptsize);
+    i32 w = 0;
+    i32 h = 0;
+    val_err(TTF_SizeUTF8(font->font, text, &w, &h));
+    V2f dims = { .x = w, .y = h };
+    return dims;
+}
+
+Rect platform_center_text_in_rect(Rect rect, i32 ptsize, const char *text)
+{
+    V2f dims = platform_get_text_dims(ptsize, text);
+
+    return (Rect) {
+        .x = rect.x + (rect.w - dims.x) / 2,
+        .y = rect.y + (rect.h - dims.y) / 2,
+        .w = dims.x,
+        .h = dims.y
+    };
 }
 
 void platform_draw_text(Color fg, Color bg, Rect rect, const char *text, i32 ptsize)
@@ -161,162 +196,102 @@ void platform_draw_text(Color fg, Color bg, Rect rect, const char *text, i32 pts
     SDL_Color sdl_bg = translate_color(bg);
 
     Font *font = get_font(ptsize);
-    SDL_Surface *surface = ptr_error(TTF_RenderUTF8_Shaded(font->font, text, sdl_fg, sdl_bg));
-    SDL_Texture *texture = ptr_error(SDL_CreateTextureFromSurface(renderer, surface));
+
+    SDL_Surface *surface = ptr_err(TTF_RenderUTF8_Shaded(font->font, text, sdl_fg, sdl_bg));
+    SDL_Texture *texture = ptr_err(SDL_CreateTextureFromSurface(renderer, surface));
 
     SDL_Rect sdl_rect = translate_rect(rect);
 
-    val_error(SDL_RenderCopy(renderer, texture, NULL, &sdl_rect));
+    val_err(SDL_RenderCopy(renderer, texture, NULL, &sdl_rect));
 
     SDL_FreeSurface(surface);
     SDL_DestroyTexture(texture);
 }
 
+bool platform_point_in_rect(V2f point, Rect rect)
+{
+    SDL_Point sdl_point = translate_point(point);
+    SDL_Rect sdl_rect = translate_rect(rect);
+    return SDL_PointInRect(&sdl_point, &sdl_rect);
+}
+
+bool platform_mouse_left_down(u32 mouse_button_state)
+{
+    return mouse_button_state & SDL_BUTTON_LMASK;
+}
+
+typedef struct {
+    f64 start;
+    f64 end;
+    f64 delta_time;
+} Frame_Time;
+
 i32 main(void)
 {
-    val_error(SDL_Init(SDL_INIT_EVERYTHING));
-    val_error(TTF_Init());
+    val_err(SDL_Init(SDL_INIT_EVERYTHING));
+    val_err(TTF_Init());
 
-    window = ptr_error(SDL_CreateWindow("Raycas", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0));
-    renderer = ptr_error(SDL_CreateRenderer(window, -1, 0));
+    window = ptr_err(SDL_CreateWindow("Raycas", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0));
+    renderer = ptr_err(SDL_CreateRenderer(window, -1, 0));
+    SDL_Event event = { 0 };
+    const u8 *keystate = NULL;
 
-    fonts = malloc(32 * sizeof(Font));
-
-    // font_init(&font_16px, FONT_FILE, 16);
-    // font_init(&font_24px, FONT_FILE, 24);
-    // font_init(&font_32px, FONT_FILE, 32);
-
+    buttons_init();
+    overlay_init();
+    player_init();
     game_init("Raycas");
 
-    Overlay overlay = {
-        .state = OVERLAY_STATE_HIDDEN,
-        .msg_format = "RESOLUTION:%dx%d FPS:%d POS:(%.2f, %.2f)",
-        .ptsize = 16
-    };
-
-    Player player = player_init();
-
-    Buttons buttons = buttons_init();
-
-    // Buttons buttons = {
-    //     .items = malloc(32 * sizeof(Button)),
-    //     .count = 0,
-    //     .capacity = 32
-    // };
-    //
-    // buttons_append(&buttons, start_button);
-    // buttons_append(&buttons, quit_button);
-
-    f64 frame_start      = 0;
-    f64 frame_end        = 0;
-    f64 frame_delta_time = 0;
-
-    const u8 *keystate = SDL_GetKeyboardState(NULL);
+    Frame_Time ft = { 0 };
 
     bool quit = false;
     while (!quit) {
-        frame_start = time_in_seconds();
+        ft.start = time_in_seconds();
 
         // handle events
-        SDL_Event event = { 0 };
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
+                default: {} break;
+
                 case SDL_QUIT: {
                     quit = true;
                 } break;
 
                 case SDL_MOUSEBUTTONDOWN: {
+                    if (!game_process_mouse()) {
+                        quit = true;
+                    }
                 } break;
 
-                // case SDL_KEYDOWN: {
-                //     switch (event.key.keysym.sym) {
-                //         case SDLK_o: {
-                //             overlay.state = next_overlay_state(overlay.state);
-                //         } break;
-                //         case SDLK_m: {
-                //             game_state_toggle_map();
-                //         } break;
-                //         case SDLK_ESCAPE: {
-                //             game_state_toggle_menu();
-                //         } break;
-                //         case SDLK_c: {
-                //             game_toggle_crosshair();
-                //         } break;
-                //         case SDLK_n: {
-                //             game_next_map_index();
-                //         } break;
-                //     }
-                // } break;
+                case SDL_KEYDOWN: {
+                    game_process_key(event.key.keysym.sym);
+                } break;
             }
         }
 
-        // Get mouse positon
-        u32 mouse_button_state = get_mouse_state();
+        keystate = SDL_GetKeyboardState(NULL);
 
-        // if (game.state == GAME_STATE_MENU && mouse_button_state & SDL_BUTTON_LMASK) {
-        //     for (u32 i = 0; i < buttons.count; i++) {
-        //         SDL_Point p = {
-        //             .x = game.mouse.x,
-        //             .y = game.mouse.y
-        //         };
-        //         SDL_Rect r = {
-        //             .x = buttons.items[i].rect.x,
-        //             .y = buttons.items[i].rect.y,
-        //             .w = buttons.items[i].rect.w,
-        //             .h = buttons.items[i].rect.h
-        //         };
-        //         if (SDL_PointInRect(&p, &r)) {
-        //             buttons.items[i].pressed = true;
-        //         }
-        //     }
-        // }
-        //
-        // if (buttons.items[0].pressed) {
-        //     game_state_toggle_game();
-        // }
-        // if (buttons.items[1].pressed) {
-        //     quit = true;
-        // }
-        //
-        // // update player position
-        // if (game.state != GAME_STATE_MENU) {
-        //     V2f old_pos = player.pos;
-        //
-        //     if (keystate[SDL_SCANCODE_W]) {
-        //         player.pos = v2f_add(player.pos, v2f_scale(player.dir, frame_delta_time * player.vel));
-        //         if (is_perim(player.pos.x, player.pos.y) ||
-        //             is_wall(game.map_index, player.pos.x, player.pos.y)) {
-        //             player.pos = old_pos;
-        //         }
-        //     }
-        //     if (keystate[SDL_SCANCODE_A]) {
-        //         player_rotate_counterclockwise(&player, frame_delta_time);
-        //     }
-        //     if (keystate[SDL_SCANCODE_S]) {
-        //         player.pos = v2f_sub(player.pos, v2f_scale(player.dir, frame_delta_time * player.vel));
-        //         if (is_perim(player.pos.x, player.pos.y) ||
-        //             is_wall(game.map_index, player.pos.x, player.pos.y)) {
-        //             player.pos = old_pos;
-        //         }
-        //     }
-        //     if (keystate[SDL_SCANCODE_D]) {
-        //         player_rotate_clockwise(&player, frame_delta_time);
-        //     }
-        // }
+        // update player position
+        if (keystate[SDL_SCANCODE_W]) {
+            player_move_forward(ft.delta_time);
+        }
+        if (keystate[SDL_SCANCODE_A]) {
+            player_rotate_counterclockwise(ft.delta_time);
+        }
+        if (keystate[SDL_SCANCODE_S]) {
+            player_move_backward(ft.delta_time);
+        }
+        if (keystate[SDL_SCANCODE_D]) {
+            player_rotate_clockwise(ft.delta_time);
+        }
 
-        //update overlay
-        // if (overlay.state == OVERLAY_STATE_SHOWN) {
-        //     update_overlay_message(&overlay, frame_delta_time, player.pos);
-        // }
-        //
         // rendering
-        game_render(player, overlay, buttons);
+        game_render(ft.delta_time);
 
         SDL_RenderPresent(renderer);
 
         // compute delta time
-        frame_end = time_in_seconds();
-        frame_delta_time = frame_end - frame_start;
+        ft.end = time_in_seconds();
+        ft.delta_time = ft.end - ft.start;
     }
 
     TTF_Quit();

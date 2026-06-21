@@ -2,8 +2,6 @@
 #include "map.h"
 #include "utils.h"
 
-#include <string.h>
-
 global const Color black             = { .r = 0  , .g = 0  , .b = 0  , .a = 255 };
 global const Color white             = { .r = 255, .g = 255, .b = 255, .a = 255 };
 global const Color gray              = { .r = 127, .g = 127, .b = 127, .a = 255 };
@@ -19,6 +17,11 @@ global const Color yellow            = { .r = 255, .g = 255, .b = 0  , .a = 255 
 global const Color transparent       = { .r = 0  , .g = 0  , .b = 0  , .a = 0   };
 global const Color black_transparent = { .r = 0  , .g = 0  , .b = 0  , .a = 127 };
 
+Buttons buttons = { 0 };
+Overlay overlay = { 0 };
+Player player   = { 0 };
+Game game       = { 0 };
+
 internal Rect make_rect(u32 x, u32 y, u32 w, u32 h)
 {
     return (Rect) {
@@ -29,7 +32,7 @@ internal Rect make_rect(u32 x, u32 y, u32 w, u32 h)
     };
 }
 
-Button make_button(const char *text, i32 ptsize, Rect rect, Color fg, Color bg, Color border)
+internal Button make_button(const char *text, i32 ptsize, Rect rect, Color fg, Color bg, Color border)
 {
     return (Button) {
         .text = text,
@@ -42,28 +45,112 @@ Button make_button(const char *text, i32 ptsize, Rect rect, Color fg, Color bg, 
     };
 }
 
-Buttons buttons_init()
+void buttons_init(void)
 {
     Button start_button = make_button("START", 32,
                                       make_rect(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y - 120, 200, 80),
                                       white, blue, black);
     Button quit_button = make_button("QUIT", 32,
-                                      make_rect(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y + 40, 200, 80),
-                                      white, red, black);
+                                     make_rect(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y + 40, 200, 80),
+                                     white, red, black);
 
-    return (Buttons) {
-        .items[0] = start_button,
-        .items[1] = quit_button
-    };
+    buttons.items[0] = start_button;
+    buttons.items[1] = quit_button;
 }
 
+void overlay_init(void)
+{
+    overlay.state = OVERLAY_STATE_HIDDEN;
+    overlay.msg_format = "RESOLUTION:%dx%d FPS:%d POS:(%.2f, %.2f)";
+    overlay.ptsize = 12;
+}
 
-// void buttons_append(Buttons *buttons, Button button) {
-//     buttons->items[buttons->count++] = button;
-//     assert(buttons->count <= buttons->capacity);
-// }
+internal inline void overlay_update_message(Overlay *overlay, f64 dt, V2f player_pos)
+{
+    u32 fps = 1.0f / dt;
+    sprintf(overlay->msg, overlay->msg_format,
+            game.width, game.height,
+            fps, player_pos.x, player_pos.y);
+}
 
-global Game game = { 0 };
+internal Overlay_State overlay_next_state(Overlay_State state)
+{
+    return (state + 1) % _overlay_state_count;
+}
+
+void player_init(void)
+{
+    player.pos.x = 200;
+    player.pos.y = 200;
+    player.dir.x = 1;
+    player.dir.y = 0;
+    player.vel = 200;
+    player.rotation_vel = 120;
+    player.fov = M_PI_2;
+    player.radius = 6;
+    player.color = blue;
+}
+
+void player_move_forward(f64 dt)
+{
+    if (game.state == STATE_MENU) return;
+
+    V2f old_pos = player.pos;
+
+    player.pos = v2f_add(player.pos, v2f_scale(player.dir, dt * player.vel));
+    if (is_perim(player.pos.x, player.pos.y) || is_wall(game.map_index, player.pos.x, player.pos.y)) {
+        player.pos = old_pos;
+    }
+}
+
+void player_move_backward(f64 dt)
+{
+    if (game.state == STATE_MENU) return;
+
+    V2f old_pos = player.pos;
+
+    player.pos = v2f_sub(player.pos, v2f_scale(player.dir, dt * player.vel));
+    if (is_perim(player.pos.x, player.pos.y) || is_wall(game.map_index, player.pos.x, player.pos.y)) {
+        player.pos = old_pos;
+    }
+}
+
+void player_rotate_clockwise(f64 dt)
+{
+    if (game.state == STATE_MENU) return;
+
+    player.dir = v2f_rotate(player.dir, radians_from_degrees(player.rotation_vel) * dt);
+}
+
+void player_rotate_counterclockwise(f64 dt)
+{
+    if (game.state == STATE_MENU) return;
+
+    player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
+}
+
+internal void draw_walls(Color color)
+{
+    for (u64 y = 0; y < game.height; y += CELL_SIZE) {
+        for (u64 x = 0; x < game.width; x += CELL_SIZE) {
+            if (is_wall(game.map_index, x, y)) {
+                Rect rect = make_rect(x, y, CELL_SIZE, CELL_SIZE);
+                platform_draw_rect(color, rect);
+            }
+        }
+    }
+}
+
+internal void draw_grid(Color color)
+{
+    for (u64 y = CELL_SIZE; y < game.height; y += CELL_SIZE) {
+        platform_draw_line(color, make_v2f(0, y), make_v2f(game.width, y));
+    }
+
+    for (u64 x = CELL_SIZE; x < game.width; x += CELL_SIZE) {
+        platform_draw_line(color, make_v2f(x, 0), make_v2f(x, game.height));
+    }
+}
 
 internal Intersect find_intersect(V2f pos, V2f dir)
 {
@@ -123,29 +210,6 @@ internal Intersect find_intersect(V2f pos, V2f dir)
     return intersect;
 }
 
-internal void draw_walls(Color color)
-{
-    for (u64 y = 0; y < WINDOW_HEIGHT; y += CELL_SIZE) {
-        for (u64 x = 0; x < WINDOW_WIDTH; x += CELL_SIZE) {
-            if (is_wall(game.map_index, x, y)) {
-                Rect rect = make_rect(x, y, CELL_SIZE, CELL_SIZE);
-                platform_draw_rect(color, rect);
-            }
-        }
-    }
-}
-
-internal void draw_grid(Color color)
-{
-    for (u64 y = CELL_SIZE; y < WINDOW_HEIGHT; y += CELL_SIZE) {
-        platform_draw_line(color, make_v2f(0, y), make_v2f(WINDOW_WIDTH, y));
-    }
-
-    for (u64 x = CELL_SIZE; x < WINDOW_WIDTH; x += CELL_SIZE) {
-        platform_draw_line(color, make_v2f(x, 0), make_v2f(x, WINDOW_HEIGHT));
-    }
-}
-
 internal void draw_crosshair(Color color)
 {
     i32 l = 5;
@@ -157,15 +221,15 @@ internal void draw_3d_view(Player player)
 {
     f32 angle_curr  = -player.fov / 2.0f;
     f32 angle_end   =  player.fov / 2.0f;
-    f32 angle_step  =  player.fov / (WINDOW_WIDTH - 1);
-    for (u64 buffer_x; angle_curr <= angle_end; angle_curr += angle_step, buffer_x++) {
+    f32 angle_step  =  player.fov / (game.width - 1);
+    for (u64 buffer_x = 0; angle_curr <= angle_end; angle_curr += angle_step, buffer_x++) {
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = find_intersect(player.pos, curr_dir);
 
-        f32 wall_height = WINDOW_HEIGHT * WALL_HEIGHT_MULTIPLIER / intersect.perp_wall_dist;
+        f32 wall_height = game.height * WALL_HEIGHT_MULTIPLIER / intersect.perp_wall_dist;
 
-        f32 wall_top    = CLAMP((-wall_height / 2.0f) + (WINDOW_HEIGHT / 2.0f), 0.0f, WINDOW_HEIGHT - 1.0f);
-        f32 wall_bottom = CLAMP(( wall_height / 2.0f) + (WINDOW_HEIGHT / 2.0f), 0.0f, WINDOW_HEIGHT - 1.0f);
+        f32 wall_top    = CLAMP((-wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
+        f32 wall_bottom = CLAMP(( wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
 
         Color sky_color = light_blue;
         Color wall_color = intersect.perim ? black : (intersect.vertical ? gray : light_gray);
@@ -175,7 +239,6 @@ internal void draw_3d_view(Player player)
         V2f wall_end     = make_v2f(buffer_x, wall_bottom);
 
         platform_draw_line(sky_color, make_v2f(window_start.x, window_start.y), make_v2f(wall_start.x, wall_start.y));
-
         platform_draw_line(wall_color, make_v2f(wall_start.x, wall_start.y), make_v2f(wall_end.x, wall_end.y));
     }
 
@@ -193,7 +256,7 @@ internal void draw_player_fov(Color color, Player player, u32 beam_spread)
 {
     f32 angle_curr  = -player.fov / 2.0f;
     f32 angle_end   =  player.fov / 2.0f;
-    f32 angle_step  =  player.fov / (WINDOW_WIDTH - 1) * beam_spread;
+    f32 angle_step  =  player.fov / (game.width - 1) * beam_spread;
     for (u64 buffer_x; angle_curr <= angle_end; angle_curr += angle_step, buffer_x++) {
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = find_intersect(player.pos, curr_dir);
@@ -211,10 +274,10 @@ internal void draw_map(Player player)
     draw_player_fov(orange, player, 8);
 }
 
-internal void minimap_draw_walls(Color color, f32 scale)
+internal void draw_minimap_walls(Color color, f32 scale)
 {
-    for (u64 y = 0; y < WINDOW_HEIGHT; y += CELL_SIZE) {
-        for (u64 x = 0; x < WINDOW_WIDTH; x += CELL_SIZE) {
+    for (u64 y = 0; y < game.height; y += CELL_SIZE) {
+        for (u64 x = 0; x < game.width; x += CELL_SIZE) {
             if (is_wall(game.map_index, x, y)) {
                 Rect rect = make_rect(x * scale + game.minimap_dims.x, y * scale + game.minimap_dims.y,
                                       CELL_SIZE * scale, CELL_SIZE * scale);
@@ -224,7 +287,7 @@ internal void minimap_draw_walls(Color color, f32 scale)
     }
 }
 
-internal void minimap_draw_grid(Color color, f32 scale)
+internal void draw_minimap_grid(Color color, f32 scale)
 {
     f32 scaled_cell_size = CELL_SIZE * scale;
 
@@ -238,79 +301,48 @@ internal void minimap_draw_grid(Color color, f32 scale)
 }
 
 internal void draw_minimap(Player player) {
-    f64 scale = (f64)game.minimap_dims.w / WINDOW_WIDTH;
-
-    // check that the horisontal and vertical scale are equal
-    {
-        f64 scale_vertical = (f64)game.minimap_dims.h / WINDOW_HEIGHT;
-        assert(scale == scale_vertical && "Horisontal and vertical scale should be equal in the minipap");
-    }
+    f64 scale = (f64)game.minimap_dims.w / game.width;
 
     platform_draw_rect(green, game.minimap_dims);
 
-    minimap_draw_walls(gray, scale);
-    minimap_draw_grid(black, scale);
+    draw_minimap_walls(gray, scale);
+    draw_minimap_grid(black, scale);
 
     V2f player_minimap_pos = v2f_add(v2f_scale(player.pos, scale), make_v2f(game.minimap_dims.x, game.minimap_dims.y));
     platform_draw_circle(blue, player_minimap_pos, 2, true);
 }
 
-internal Rect center_button_text_in_rect(Button button)
-{
-    return (Rect) {
-        .x = button.rect.x + (button.rect.w - button.ptsize * strlen(button.text)) / 2,
-        .y = button.rect.y + (button.rect.h - button.ptsize) / 2,
-        .w = button.ptsize * strlen(button.text),
-        .h = button.ptsize
-    };
-}
-
 internal void draw_button(Button button) {
     platform_draw_rect(button.bg, button.rect);
-    Rect rect = center_button_text_in_rect(button);
-    platform_draw_text(button.fg, button.bg, button.rect, button.text, button.ptsize);
+    Rect text_rect = platform_center_text_in_rect(button.rect, button.ptsize, button.text);
+    platform_draw_text(button.fg, button.bg, text_rect, button.text, button.ptsize);
 }
 
 internal void draw_menu(Buttons buttons)
 {
-    u64 button_count = sizeof(buttons) / sizeof(buttons.items[0]);
-    for (u64 i = 0; i < button_count; i++) {
+    for (u64 i = 0; i < ARRAY_LEN(buttons.items); i++) {
         draw_button(buttons.items[i]);
     }
 }
 
 internal void draw_overlay(Overlay overlay)
 {
-    Rect rect = make_rect(0, 0, overlay.ptsize * strlen(overlay.msg), overlay.ptsize);
-    platform_draw_text(white, black_transparent, rect, overlay.msg, overlay.ptsize);
-}
-
-Player player_init()
-{
-    return (Player) {
-        .pos.x = 200,
-        .pos.y = 200,
-        .dir.x = 1,
-        .dir.y = 0,
-        .vel = 200,
-        .rotation_vel = 120,
-        .fov = M_PI_2,
-        .radius = 6,
-        .color = blue
-    };
+    V2f dims = platform_get_text_dims(overlay.ptsize, overlay.msg);
+    overlay.rect = make_rect(0, 0, dims.x, dims.y);
+    platform_draw_text(white, black_transparent, overlay.rect, overlay.msg, overlay.ptsize);
 }
 
 void game_init(const char *title)
 {
     game.title = title;
     game.width = WINDOW_WIDTH;
-    game.height= WINDOW_HEIGHT;
+    game.height = WINDOW_HEIGHT;
 
     game.minimap_dims = (Rect) {
-         .x = WINDOW_WIDTH * ((f32)3/4),
+         .x = game.width * ((f32)3/4),
          .y = 0,
-         .h = WINDOW_HEIGHT * ((f32)1/4),
-         .w = WINDOW_WIDTH * ((f32)1/4)
+         .h = game.height * ((f32)1/4),
+         .w = game.width * ((f32)1/4)
      };
 
      game.mouse = make_v2f(0, 0);
@@ -323,19 +355,20 @@ void game_init(const char *title)
      game.quit = false;
 }
 
-void game_render(Player player, Overlay overlay, Buttons buttons)
+void game_render(f64 dt)
 {
     platform_clear_backbuffer(green);
-
     switch (game.state) {
         default: {} break;
         case STATE_GAME: {
             draw_3d_view(player);
             draw_minimap(player);
         } break;
+
         case STATE_MAP: {
             draw_map(player);
         } break;
+
         case STATE_MENU: {
             draw_menu(buttons);
         } break;
@@ -345,30 +378,23 @@ void game_render(Player player, Overlay overlay, Buttons buttons)
        default : {} break;
        case OVERLAY_STATE_HIDDEN: {} break;
        case OVERLAY_STATE_SHOWN: {
-            draw_overlay(overlay);
+           overlay_update_message(&overlay, dt, player.pos);
+           draw_overlay(overlay);
            // NOTE: can change to wrapped font rendering if msg gets too long
-           // WARNING: this code block cannot be factored out into a seperate function.
-           // doing so will cause draw_3d_view() to not draw anything *unless* a print statement
-           // including both a character and newline appear above the call to draw_3d_view()
        } break;
     }
 }
 
-void game_state_toggle_game(void)
+internal void game_state_toggle_map(void)
 {
-    game.state = STATE_GAME;
-}
-
-void game_state_toggle_map(void)
-{
-    if (game.state == STATE_GAME || game.state == STATE_MENU) {
+    if (game.state == STATE_GAME) {
         game.state = STATE_MAP;
     } else if (game.state == STATE_MAP) {
         game.state = STATE_GAME;
     }
 }
 
-void game_state_toggle_menu(void)
+internal void game_state_toggle_menu(void)
 {
     // TODO: Play sound when entering menu
     if (game.state == STATE_GAME || game.state == STATE_MAP) {
@@ -378,41 +404,58 @@ void game_state_toggle_menu(void)
     }
 }
 
-void player_rotate_clockwise(Player *player, f64 dt)
-{
-    player->dir = v2f_rotate(player->dir, radians_from_degrees(player->rotation_vel) * dt);
-}
-
-void player_rotate_counterclockwise(Player *player, f64 dt)
-{
-    player->dir = v2f_rotate(player->dir, radians_from_degrees(-player->rotation_vel) * dt);
-}
-
-
-Overlay_State overlay_next_state(Overlay_State state)
-{
-    return (state + 1) % _overlay_state_count;
-}
-
-internal inline void overlay_update_message(Overlay *overlay, f64 dt, V2f player_pos)
-{
-    u32 fps = 1 / dt;
-    sprintf(overlay->msg, overlay->msg_format,
-            WINDOW_WIDTH, WINDOW_HEIGHT,
-            fps, player_pos.x, player_pos.y);
-}
-
-void game_next_map_index()
-{
-    game.map_index = next_map_index(game.map_index);
-}
-
-void game_toggle_crosshair()
+internal void game_toggle_crosshair(void)
 {
     game.show_crosshair = !game.show_crosshair;
 }
 
-internal bool point_in_rect(V2f p, Rect r)
+// NOTE: returns false if quit button is pressed
+bool game_process_mouse(void)
 {
-    return ((p.x >= r.x) && (p.x < (r.x + r.w)) && (p.y >= r.y) && (p.y < (r.y + r.h)));
+    if (game.state != STATE_MENU) {
+        return true;
+    }
+
+    u32 mouse_button_state = platform_get_mouse_state(&game.mouse);
+
+    if (platform_mouse_left_down(mouse_button_state)) {
+        for (u32 i = 0; i < ARRAY_LEN(buttons.items); i++) {
+            if (platform_point_in_rect(game.mouse, buttons.items[i].rect)) {
+                buttons.items[i].pressed = true;
+            } else {
+                buttons.items[i].pressed = false;
+            }
+        }
+    }
+
+    if (buttons.start_button.pressed) {
+        game_state_toggle_menu();
+    }
+    if (buttons.quit_button.pressed) {
+        return false;
+    }
+
+    return true;
+}
+
+void game_process_key(Key key)
+{
+    switch (key) {
+        default: {} break;
+        case KEY_O: {
+            overlay.state = overlay_next_state(overlay.state);
+        } break;
+        case KEY_M: {
+            game_state_toggle_map();
+        } break;
+        case KEY_ESCAPE: {
+            game_state_toggle_menu();
+        } break;
+        case KEY_C: {
+            game_toggle_crosshair();
+        } break;
+        case KEY_N: {
+            game.map_index = next_map_index(game.map_index);
+        } break;
+    }
 }
