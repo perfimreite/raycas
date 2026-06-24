@@ -1,5 +1,6 @@
 #include "constants.h"
 #include "vector.h"
+#include "map.h"
 
 #ifndef GAME_H
 #define GAME_H
@@ -102,6 +103,7 @@ typedef struct {
 
     i32 ptsize;
     Rect rect;
+    Rect text_rect;
     Color bg;
     Color fg;
     Color border;
@@ -148,6 +150,7 @@ typedef struct {
     f64 perp_wall_dist;
     bool vertical;
     bool perim;
+    Map_Square_Kind map_square_kind;
 } Intersect;
 
 typedef enum {
@@ -156,6 +159,12 @@ typedef enum {
     STATE_MENU,
     _state_count
 } State;
+
+typedef struct {
+    u32 *data;
+    u64 width;
+    u64 height;
+} Texture;
 
 typedef struct {
     const char *title;
@@ -173,6 +182,7 @@ typedef struct {
     bool show_crosshair;
     Color crosshair_color;
     bool quit;
+    Texture texture;
 } Game;
 
 void buttons_init(void);

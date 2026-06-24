@@ -4,11 +4,11 @@ internal i32 map[MAP_COUNT][ROWS][COLS] = {
     {
         {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
         {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
-        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0},
-        {0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+        {1, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 1, 1, 1, 0, 0},
+        {0, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0},
         {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
         {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
@@ -50,6 +50,11 @@ bool is_wall(i32 map_index, f32 x, f32 y)
     return get_map_square(map_index, x, y) == WALL;
 }
 
+bool is_texture(i32 map_index, f32 x, f32 y)
+{
+    return get_map_square(map_index, x, y) == TEXTURE;
+}
+
 bool is_perim(f32 x, f32 y)
 {
     return (0.0f > y || y >= WINDOW_HEIGHT) || (0.0f > x || x >= WINDOW_WIDTH);
@@ -65,6 +70,11 @@ Map_Square_Kind get_map_square_by_tile(i32 map_index, i32 x, i32 y)
 bool is_wall_tile(i32 map_index, i32 x, i32 y)
 {
     return get_map_square_by_tile(map_index, x, y) == WALL;
+}
+
+bool is_texture_tile(i32 map_index, i32 x, i32 y)
+{
+    return get_map_square_by_tile(map_index, x, y) == TEXTURE;
 }
 
 bool is_perim_tile(i32 x, i32 y)

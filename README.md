@@ -9,7 +9,9 @@ Raycas is a game engine built using the raycasting rendering technique to create
 
 ## Dependecies
 
-Raycas depends on SDL2.
+- Raycas depends on SDL2.
+- "stb_image.h" is used to read .png files: https://github.com/nothings/stb/blob/master/stb_image.h.
+- The game uses textures from Wolfenstein.
 
 ```console
 $ sudo apt install libsdl2-2.0-0 libsdl2-dev libsdl2-ttf-2.0-0 libsdl2-ttf-dev libsdl2-image-2.0-0 libsdl2-image-dev

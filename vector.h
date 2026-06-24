@@ -21,6 +21,7 @@ V2f v2f_cell(V2f a);
 V2f v2f_normal(V2f a);
 V2f v2f_scale(V2f a, f32 k);
 V2f v2f_rotate(V2f a, f32 angle);
+V2f v2f_floor(V2f a);
 
 f32 v2f_square_len(V2f a);
 f32 v2f_len(V2f a);

@@ -66,6 +66,11 @@ V2f v2f_rotate(V2f a, f32 angle)
     return (V2f){ .x = x, .y = y };
 }
 
+V2f v2f_floor(V2f a)
+{
+    return (V2f){ .x = floor(a.x), .y = floor(a.y)};
+}
+
 f32 v2f_square_len(V2f a)
 {
     return a.x * a.x + a.y * a.y;

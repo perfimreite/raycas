@@ -12,6 +12,9 @@
 #define WINDOW_HEIGHT 720
 #endif
 
+#define DEFAULT_TEXTURE_WIDTH 64
+#define DEFAULT_TEXTURE_HEIGHT 64
+
 #define WINDOW_CENTER_X (((WINDOW_WIDTH)  - 1.0f) / 2.0f)
 #define WINDOW_CENTER_Y (((WINDOW_HEIGHT) - 1.0f) / 2.0f)
 
@@ -25,6 +28,7 @@ static_assert(WINDOW_WIDTH / COLS == WINDOW_HEIGHT / ROWS);
 #define MAP_COUNT 2
 
 #define FONT_FILE "fonts/CascadiaMono.ttf"
+#define TEXTURES_PATH "assets/wolfenstein_textures/"
 #define MAX_FONT_COUNT 32
 
 #endif // CONSTANTS_H
