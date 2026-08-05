@@ -1,6 +1,4 @@
-#include "meta.h"
-
-#include <stdbool.h>
+#include "base.h"
 
 #ifndef VECTOR_H
 #define VECTOR_H
@@ -10,8 +8,8 @@ typedef struct {
     f32 y;
 } V2f;
 
-bool v2f_zero(V2f a);
-bool v2f_eq(V2f a, V2f b);
+b32 v2f_zero(V2f a);
+b32 v2f_eq(V2f a, V2f b);
 
 V2f make_v2f(f32 x, f32 y);
 V2f v2f_add(V2f a, V2f b);

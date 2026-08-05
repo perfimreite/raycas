@@ -5,12 +5,12 @@
 
 V2f zero_vector = { .x = 0, .y = 0 };
 
-bool v2f_zero(V2f a)
+b32 v2f_zero(V2f a)
 {
     return v2f_eq(a, zero_vector);
 }
 
-bool v2f_eq(V2f a, V2f b)
+b32 v2f_eq(V2f a, V2f b)
 {
     return a.x == b.x && a.y == b.y;
 }

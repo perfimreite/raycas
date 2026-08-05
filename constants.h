@@ -1,4 +1,4 @@
-#include "meta.h"
+#include "base.h"
 #include <assert.h>
 
 #ifndef CONSTANTS_H
@@ -24,6 +24,8 @@
 #define WALL_HEIGHT_MULTIPLIER ((f32)(WINDOW_HEIGHT) / 16)
 
 static_assert(WINDOW_WIDTH / COLS == WINDOW_HEIGHT / ROWS);
+
+#define OVERLAY_TEXT_SIZE 128
 
 #define MAP_COUNT 2
 

@@ -1,8 +1,19 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
 
-#ifndef META_H
-#define META_H
+#ifndef BASE_H
+#define BASE_H
+
+/* === Assert === */
+#define DEBUG
+
+#ifdef DEBUG
+#define ASSERT(x) assert(x)
+#else
+#define Assert(x)
+#endif // DEBUG
 
 /* === types === */
 typedef int8_t   i8;
@@ -15,6 +26,8 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 typedef float    f32;
 typedef double   f64;
+typedef int16_t  b16;
+typedef int32_t  b32;
 
 /* === descriptive alternatives for `static` === */
 #define internal      static
@@ -31,6 +44,7 @@ typedef double   f64;
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define CLAMP(x, min, max) MIN(MAX((x), (min)), (max))
 
-#define ARRAY_LEN(a) (sizeof((a)) / sizeof((a)[0]))
+/* === helper macros for static arrays === */
+#define ARRAY_COUNT(a) (sizeof((a)) / sizeof((a)[0]))
 
-#endif // META_H
+#endif // BASE_H

@@ -5,84 +5,6 @@
 #ifndef GAME_H
 #define GAME_H
 
-typedef enum {
-    KEY_UNKNOWN = 0,
-
-    KEY_RETURN = '\r',
-    KEY_ESCAPE = '\x1B',
-    KEY_BACKSPACE = '\b',
-    KEY_TAB = '\t',
-    KEY_SPACE = ' ',
-    KEY_EXCLAIM = '!',
-    KEY_QUOTEDBL = '"',
-    KEY_HASH = '#',
-    KEY_PERCENT = '%',
-    KEY_DOLLAR = '$',
-    KEY_AMPERSAND = '&',
-    KEY_QUOTE = '\'',
-    KEY_LEFTPAREN = '(',
-    KEY_RIGHTPAREN = ')',
-    KEY_ASTERISK = '*',
-    KEY_PLUS = '+',
-    KEY_COMMA = ',',
-    KEY_MINUS = '-',
-    KEY_PERIOD = '.',
-    KEY_SLASH = '/',
-
-    KEY_0 = '0',
-    KEY_1 = '1',
-    KEY_2 = '2',
-    KEY_3 = '3',
-    KEY_4 = '4',
-    KEY_5 = '5',
-    KEY_6 = '6',
-    KEY_7 = '7',
-    KEY_8 = '8',
-    KEY_9 = '9',
-
-    KEY_COLON = ':',
-    KEY_SEMICOLON = ';',
-    KEY_LESS = '<',
-    KEY_EQUALS = '=',
-    KEY_GREATER = '>',
-    KEY_QUESTION = '?',
-    KEY_AT = '@',
-
-    KEY_LEFTBRACKET = '[',
-    KEY_BACKSLASH = '\\',
-    KEY_RIGHTBRACKET = ']',
-    KEY_CARET = '^',
-    KEY_UNDERSCORE = '_',
-    KEY_BACKQUOTE = '`',
-
-    KEY_A = 'a',
-    KEY_B = 'b',
-    KEY_C = 'c',
-    KEY_D = 'd',
-    KEY_E = 'e',
-    KEY_F = 'f',
-    KEY_G = 'g',
-    KEY_H = 'h',
-    KEY_I = 'i',
-    KEY_J = 'j',
-    KEY_K = 'k',
-    KEY_L = 'l',
-    KEY_M = 'm',
-    KEY_N = 'n',
-    KEY_O = 'o',
-    KEY_P = 'p',
-    KEY_Q = 'q',
-    KEY_R = 'r',
-    KEY_S = 's',
-    KEY_T = 't',
-    KEY_U = 'u',
-    KEY_V = 'v',
-    KEY_W = 'w',
-    KEY_X = 'x',
-    KEY_Y = 'y',
-    KEY_Z = 'z',
-} Key;
-
 typedef struct {
     u32 x;
     u32 y;
@@ -97,25 +19,37 @@ typedef struct {
     u8 a;
 } Color;
 
-typedef struct {
-    const char *text;
-    bool pressed;
+typedef enum {
+    BOX_STYLE_SQUARED,
+    BOX_STYLE_ROUNDED,
+} Box_Style;
 
+typedef struct {
+    // TODO: text align left, right, top, bottom.
+    const char *text;
     i32 ptsize;
+
     Rect rect;
-    Rect text_rect;
-    Color bg;
+    Box_Style style;
     Color fg;
-    Color border;
+    Color bg;
+    // Color border;
+} Box;
+
+typedef struct {
+    b32 pressed;
+    b32 hovered;
+    Box box;
 } Button;
 
-typedef struct {
-    union {
-        Button items[2];
-        struct {
-            Button start_button;
-            Button quit_button;
-        };
+typedef union {
+    // TODO: weird approach and only fits a very spesific purpouse.
+    // Should also assert that array and struct are same size
+
+    Button v[2];
+    struct {
+        Button start;
+        Button quit;
     };
 } Buttons;
 
@@ -127,8 +61,8 @@ typedef enum {
 
 typedef struct {
     Overlay_State state;
-    char msg[128];
-    const char *msg_format;
+    char text[OVERLAY_TEXT_SIZE];
+    const char *text_format;
     i32 ptsize;
     Rect rect;
 } Overlay;
@@ -148,17 +82,17 @@ typedef struct {
 typedef struct {
     V2f pos;
     f64 perp_wall_dist;
-    bool vertical;
-    bool perim;
-    Map_Square_Kind map_square_kind;
+    b32 vertical;
+    b32 perim;
+    Map_Tile_Kind map_tile_kind;
 } Intersect;
 
 typedef enum {
-    STATE_GAME,
-    STATE_MAP,
-    STATE_MENU,
-    _state_count
-} State;
+    VIEW_GAME,
+    VIEW_MAP,
+    VIEW_MENU,
+    _view_count
+} View;
 
 typedef struct {
     u32 *data;
@@ -166,52 +100,98 @@ typedef struct {
     u64 height;
 } Texture;
 
+typedef enum {
+    CURSOR_KIND_ARROW,
+    CURSOR_KIND_HAND
+} Cursor_Kind;
+
 typedef struct {
-    const char *title;
+    // for events (actions based on clicks)
+    b32 is_down;
+    b32 was_down;
+
+    // for polling (actions based on holding down)
+    b32 active;
+} Key;
+
+typedef struct {
+    // Cursor position
+    V2f pos;
+    // Cursor kind
+    Cursor_Kind active_cursor;
+
+    // Mouse buttons
+    Key key_left;
+    Key key_middel;
+    Key key_right;
+} Mouse_State;
+
+typedef union {
+    Key v[9];
+
+    struct {
+        // Movement
+        Key key_w;
+        Key key_a;
+        Key key_s;
+        Key key_d;
+
+        // Controls
+        Key key_c;
+        Key key_o;
+        Key key_m;
+        Key key_n;
+        Key key_escape;
+    };
+} Keyboard_State;
+
+typedef struct {
+    Buttons buttons;
+    Color bg;
+} Menu;
+
+typedef struct {
+    b32 quit;
 
     u32 width;
     u32 height;
 
     Rect minimap_dims;
 
-    V2f mouse;
+    Mouse_State mouse_state;
+    Keyboard_State keyboard_state;
 
-    i32 map_index;
+    u32 map_index;
 
-    State state;
-    bool show_crosshair;
+    View view;
+
     Color crosshair_color;
-    bool quit;
+    b32 show_crosshair;
     Texture texture;
+
+    Menu menu;
 } Game;
 
-void buttons_init(void);
+Rect make_rect(u32 x, u32 y, u32 w, u32 h);
 
 void overlay_init(void);
 
 void player_init(void);
-void player_move_forward(f64 dt);
-void player_move_backward(f64 dt);
-void player_rotate_clockwise(f64 dt);
-void player_rotate_counterclockwise(f64 dt);
+
+void game_init  (void);
+void game_render(f64 dt);
 
 void platform_clear_backbuffer   (Color color);
 void platform_draw_point         (Color color, V2f a);
 void platform_draw_line          (Color color, V2f a, V2f b);
 void platform_draw_rect          (Color color, Rect rect);
-void platform_draw_circle        (Color color, V2f a, i32 radius, bool filled);
-V2f platform_get_text_dims       (i32 ptsize, const char *text);
+void platform_draw_rect_rounded  (Color color, Rect rect, i32 radius);
+void platform_draw_circle        (Color color, V2f a, i32 radius, b32 filled);
+V2f  platform_get_text_dims      (i32 ptsize, const char *text);
 Rect platform_center_text_in_rect(Rect rect, i32 ptsize, const char *text);
 void platform_draw_text          (Color fg, Color bg, Rect rect, const char *text, i32 ptsize);
-bool platform_point_in_rect      (V2f point, Rect rect);
-bool platform_key_down           (Key key);
-u32  platform_get_mouse_state    (V2f *mouse_pos);
-bool platform_mouse_left_down    (u32 mouse_button_state);
-
-void game_process_key(Key key);
-bool game_process_mouse(void);
-
-void game_init(const char *title);
-void game_render(f64 dt);
+b32  platform_point_in_rect      (V2f point, Rect rect);
+void platform_get_mouse_state    (Mouse_State *mouse_state);
+void platform_set_cursor         (Cursor_Kind cursor);
 
 #endif // GAME_H
