@@ -9,6 +9,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
+// TODO: Consider moving types into main.h
+
 typedef struct {
     const char *path;
     i32 ptsize;
@@ -239,7 +241,7 @@ b32 platform_point_in_rect(V2f point, Rect rect)
 typedef struct {
     f64 start;
     f64 end;
-    f64 delta_time;
+    f64 dt;
 } Frame_Time;
 
 internal void platform_process_key(Key *key, b32 repeat)
@@ -353,13 +355,13 @@ i32 main(void)
         platform_update_mouse_state(&game.mouse_state);
 
         // rendering
-        game_render(frame_time.delta_time);
+        game_render(frame_time.dt);
 
         SDL_RenderPresent(renderer);
 
         // compute delta time
         frame_time.end = time_in_seconds();
-        frame_time.delta_time = frame_time.end - frame_time.start;
+        frame_time.dt = frame_time.end - frame_time.start;
     }
 
     TTF_Quit();

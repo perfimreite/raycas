@@ -1,4 +1,4 @@
-#include "base.h" 
+#include "base.h"
 
 #include <math.h>
 #include <time.h>

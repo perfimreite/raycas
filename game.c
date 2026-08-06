@@ -1,5 +1,4 @@
 #include "game.h"
-#include "map.h"
 #include "utils.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -25,6 +24,66 @@ global const Color black_transparent = { .r = 0  , .g = 0  , .b = 0  , .a = 127 
 global Overlay overlay = {0};
 global Player player   = {0};
 Game game              = {0};
+
+global i32 map[MAP_COUNT][ROWS][COLS] = {
+    {
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
+        {1, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 1, 1, 1, 0, 0},
+        {0, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+    },
+    {
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
+        {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+        {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1},
+    }
+};
+
+i32 next_map_index(i32 map_index)
+{
+    return (map_index + 1) % MAP_COUNT;
+}
+
+Map_Tile_Kind get_map_tile(i32 map_index, f32 x, f32 y)
+{
+    i32 cy = y / CELL_SIZE;
+    i32 cx = x / CELL_SIZE;
+    assert(cy >= 0);
+    assert(cx >= 0);
+    return map[map_index][cy][cx];
+}
+
+b32 is_wall(i32 map_index, f32 x, f32 y)
+{
+    return get_map_tile(map_index, x, y) == MAP_TILE_WALL;
+}
+
+b32 is_texture(i32 map_index, f32 x, f32 y)
+{
+    return get_map_tile(map_index, x, y) == MAP_TILE_TEXTURE;
+}
+
+b32 is_perim(f32 x, f32 y)
+{
+    return (0.0f > y || y >= WINDOW_HEIGHT) || (0.0f > x || x >= WINDOW_WIDTH);
+}
 
 internal Texture get_fallback_texture()
 {
@@ -62,8 +121,8 @@ internal Texture load_texture_from_file(const char *file_path)
     FILE *file = fopen(file_path, "rb");
 
     if (file != NULL) {
-        i32 width, height, components_per_pixel;
-        u8 *data = stbi_load_from_file(file, &width, &height, &components_per_pixel, STBI_rgb_alpha);
+        i32 width, height, components;
+        u8 *data = stbi_load_from_file(file, &width, &height, &components, STBI_rgb_alpha);
 
         if (data != NULL) {
             texture.data = (u32 *)data;
@@ -138,6 +197,9 @@ internal Buttons create_menu_buttons(void)
     buttons.v[0] = start;
     buttons.v[1] = quit;
 
+    // Check that right amount of buttons are in union
+    ASSERT(&buttons.button_end - &buttons.v[0] == ARRAY_COUNT(buttons.v));
+
     return buttons;
 }
 
@@ -157,9 +219,9 @@ internal inline void overlay_update_message(Overlay *overlay, u32 fps, V2f playe
     ASSERT(bytes_written < OVERLAY_TEXT_SIZE);
 }
 
-internal Overlay_State overlay_next_state(Overlay_State state)
+internal void overlay_next_state()
 {
-    return (state + 1) % _overlay_state_count;
+    overlay.state = (overlay.state + 1) % _overlay_state_count;
 }
 
 void player_init(void)
@@ -523,6 +585,9 @@ void game_init()
     game.mouse_state = (Mouse_State){0};
     game.keyboard_state = (Keyboard_State){0};
 
+    // Check that right amount of keys are in union
+    ASSERT(&game.keyboard_state.key_end - &game.keyboard_state.v[0] == ARRAY_COUNT(game.keyboard_state.v));
+
     game.map_index = 0;
 
     game.view = VIEW_MENU;
@@ -536,7 +601,7 @@ void game_init()
     game.menu.bg = gray;
 }
 
-internal void game_state_toggle_map(void)
+internal void game_view_toggle_map(void)
 {
     if (game.view == VIEW_GAME || game.view == VIEW_MENU) {
         game.view = VIEW_MAP;
@@ -545,7 +610,7 @@ internal void game_state_toggle_map(void)
     }
 }
 
-internal void game_state_toggle_menu(void)
+internal void game_view_toggle_menu(void)
 {
     // TODO: Play sound when entering menu
     if (game.view == VIEW_GAME || game.view == VIEW_MAP) {
@@ -581,7 +646,7 @@ void game_process_mouse(void)
     }
 
     if (game.menu.buttons.start.pressed) {
-        game_state_toggle_menu();
+        game_view_toggle_menu();
     }
     if (game.menu.buttons.quit.pressed) {
         game.quit = true;
@@ -591,13 +656,13 @@ void game_process_mouse(void)
 internal void game_handle_pressed_keys(f64 dt)
 {
     if (game.keyboard_state.key_o.is_down && !game.keyboard_state.key_o.was_down) {
-        overlay.state = overlay_next_state(overlay.state);
+        overlay_next_state();
     }
     if (game.keyboard_state.key_m.is_down && !game.keyboard_state.key_m.was_down) {
-        game_state_toggle_map();
+        game_view_toggle_map();
     }
     if (game.keyboard_state.key_escape.is_down && !game.keyboard_state.key_escape.was_down) {
-        game_state_toggle_menu();
+        game_view_toggle_menu();
     }
     if (game.keyboard_state.key_c.is_down && !game.keyboard_state.key_c.was_down) {
         game_toggle_crosshair();

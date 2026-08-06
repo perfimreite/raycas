@@ -1,6 +1,5 @@
 #include "constants.h"
 #include "vector.h"
-#include "map.h"
 
 #ifndef GAME_H
 #define GAME_H
@@ -44,12 +43,14 @@ typedef struct {
 
 typedef union {
     // TODO: weird approach and only fits a very spesific purpouse.
-    // Should also assert that array and struct are same size
 
     Button v[2];
     struct {
         Button start;
         Button quit;
+
+        // NOTE: All buttons must come before `button_end`
+        Button button_end;
     };
 } Buttons;
 
@@ -78,6 +79,12 @@ typedef struct {
 
     Color color;
 } Player;
+
+typedef enum {
+    MAP_TILE_EMPTY,
+    MAP_TILE_WALL,
+    MAP_TILE_TEXTURE
+} Map_Tile_Kind;
 
 typedef struct {
     V2f pos;
@@ -142,6 +149,9 @@ typedef union {
         Key key_m;
         Key key_n;
         Key key_escape;
+
+        // NOTE: All keys must come before `key_end`
+        Key key_end;
     };
 } Keyboard_State;
 
