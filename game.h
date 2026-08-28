@@ -105,7 +105,15 @@ typedef struct {
     u32 *data;
     u64 width;
     u64 height;
+
+    char *name;
 } Texture;
+
+typedef struct {
+    Texture *items;
+    size_t count;
+    size_t capacity;
+} Textures;
 
 typedef enum {
     CURSOR_KIND_ARROW,
@@ -177,7 +185,7 @@ typedef struct {
 
     Color crosshair_color;
     b32 show_crosshair;
-    Texture texture;
+    Textures textures;
 
     Menu menu;
 } Game;

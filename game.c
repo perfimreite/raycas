@@ -92,6 +92,7 @@ internal Texture get_fallback_texture()
     texture.width = DEFAULT_TEXTURE_WIDTH;
     texture.height = DEFAULT_TEXTURE_HEIGHT;
     texture.data = malloc(sizeof(u32) * DEFAULT_TEXTURE_WIDTH * DEFAULT_TEXTURE_HEIGHT);
+    texture.name = "fallback";
 
     for (u64 y = 0; y < texture.height; y++) {
         for (u64 x = 0; x < texture.width; x++) {
@@ -114,7 +115,7 @@ internal Texture get_fallback_texture()
     return texture;
 }
 
-internal Texture load_texture_from_file(const char *file_path)
+internal Texture load_texture_from_file(const char *file_path, char *name)
 {
     Texture texture = {0};
 
@@ -128,6 +129,8 @@ internal Texture load_texture_from_file(const char *file_path)
             texture.data = (u32 *)data;
             texture.width = width;
             texture.height = height;
+            // TODO: Should be able to get name from file_path
+            texture.name = name;
 
             for (u64 i = 0; i < texture.width * texture.height; i++) {
                 // Swap blue and red bytes to match color interpretation of `Color`
@@ -431,25 +434,35 @@ internal void draw_3d_view(Player player)
                     player.pos.y + intersect.perp_wall_dist * curr_dir.y;
                 wall_x -= floor(wall_x);
 
+                // Get texture
+                // TODO: Should not be hardcoded to "redbrick".
+                Texture texture = {0};
+                LIST_FOR_EACH(Texture, game.textures, t) {
+                    if (strcmp(t->name, "redbrick") == 0) {
+                        texture = *t;
+                    }
+                }
+                ASSERT(texture.name != NULL);
+
                 V2f texture_index = make_v2f(0, 0);
 
-                texture_index.x = (u32)(wall_x * game.texture.width);
+                texture_index.x = (u32)(wall_x * texture.width);
                 if ((!intersect.vertical && curr_dir.x > 0) || (intersect.vertical && curr_dir.y < 0)) {
-                    texture_index.x = game.texture.width - texture_index.x - 1;
+                    texture_index.x = texture.width - texture_index.x - 1;
                 }
 
-                f32 step = game.texture.height / wall_height;
+                f32 step = texture.height / wall_height;
                 f32 texture_pos = (wall_top - game.height / 2.0 + wall_height / 2.0) * step;
 
                 for (u64 y = 0; y < wall_height; y++, texture_pos += step) {
-                    texture_index.y = (u32)texture_pos & (game.texture.height - 1);
+                    texture_index.y = (u32)texture_pos & (texture.height - 1);
 
                     // FIXME: pixels are being pulled out so that the texture is rotated 90 degrees
                     // Solution might be to switch x and why in the loop
                     //
                     // DONE(?)
-                    // u32 pixel = game.texture.data[game.texture.height * (u32)texture_index.x + (u32)texture_index.y];
-                    u32 pixel = game.texture.data[game.texture.height * (u32)texture_index.y + (u32)texture_index.x];
+                    // u32 pixel = texture.data[texture.height * (u32)texture_index.x + (u32)texture_index.y];
+                    u32 pixel = texture.data[texture.height * (u32)texture_index.y + (u32)texture_index.x];
                     if (intersect.vertical) {
                         pixel = (pixel >> 1) & 8355711;
                     }
@@ -595,7 +608,11 @@ void game_init()
     game.crosshair_color = white;
     game.quit = false;
 
-    game.texture = load_texture_from_file(TEXTURES_PATH"redbrick.png");
+    game.textures = (Textures){0};
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"redbrick.png", "redbrick"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"mossy.png",    "mossy"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"wood.png",     "wood"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"barrel.png",   "barrel"));
 
     game.menu.buttons = create_menu_buttons();
     game.menu.bg = gray;
