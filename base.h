@@ -43,8 +43,37 @@ typedef int32_t  b32;
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define CLAMP(x, min, max) MIN(MAX((x), (min)), (max))
+#define SWAP(T, a, b) do {T t = a; a = b; b = t} while (0)
 
 /* === helper macros for static arrays === */
-#define ARRAY_COUNT(a) (sizeof((a)) / sizeof((a)[0]))
+#define ARRAY_COUNT(arr) (sizeof((arr)) / sizeof((arr)[0]))
+
+#define ARRAY_PRINT(arr, fmt)                                 \
+    do {                                                      \
+        printf("%s = {", #arr);                               \
+        for (size_t i = 0; i < ARRAY_COUNT((arr)) - 1; i++) { \
+            printf(fmt", ", (arr)[i]);                        \
+        }                                                     \
+        printf(fmt"}\n", (arr)[ARRAY_COUNT((arr)) - 1]);      \
+    } while (0)
+
+#define LIST_PUSH(list, el)                                                            \
+    do {                                                                               \
+        if ((list).count >= (list).capacity) {                                         \
+            if ((list).capacity == 0) {                                                \
+                (list).capacity = 256;                                                 \
+            } else {                                                                   \
+                (list).capacity *= 2;                                                  \
+            }                                                                          \
+        }                                                                              \
+        (list).items = realloc((list).items, (list).capacity * sizeof(*(list).items)); \
+        (list).items[(list).count++] = (el);                                           \
+    } while (0)
+
+#define LIST_POP(list) \
+    (list).items[--(list).count]
+
+#define LIST_FOR_EACH(T, list, el) \
+    for (T *(el) = (list).items; (el) < &(list).items[(list).count]; (el)++)
 
 #endif // BASE_H
