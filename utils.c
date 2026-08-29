@@ -1,4 +1,4 @@
-#include "utils.h" 
+#include "utils.h"
 
 f64 time_in_seconds(void)
 {

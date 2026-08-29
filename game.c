@@ -56,12 +56,12 @@ global i32 map[MAP_COUNT][ROWS][COLS] = {
     }
 };
 
-i32 next_map_index(i32 map_index)
+internal void next_map_index()
 {
-    return (map_index + 1) % MAP_COUNT;
+    game.map_index = (game.map_index + 1) % MAP_COUNT;
 }
 
-Map_Tile_Kind get_map_tile(i32 map_index, f32 x, f32 y)
+internal Map_Tile_Kind get_map_tile(i32 map_index, f32 x, f32 y)
 {
     i32 cy = y / CELL_SIZE;
     i32 cx = x / CELL_SIZE;
@@ -70,17 +70,17 @@ Map_Tile_Kind get_map_tile(i32 map_index, f32 x, f32 y)
     return map[map_index][cy][cx];
 }
 
-b32 is_wall(i32 map_index, f32 x, f32 y)
+internal b32 is_wall(i32 map_index, f32 x, f32 y)
 {
     return get_map_tile(map_index, x, y) == MAP_TILE_WALL;
 }
 
-b32 is_texture(i32 map_index, f32 x, f32 y)
+internal b32 is_texture(i32 map_index, f32 x, f32 y)
 {
     return get_map_tile(map_index, x, y) == MAP_TILE_TEXTURE;
 }
 
-b32 is_perim(f32 x, f32 y)
+internal b32 is_perim(f32 x, f32 y)
 {
     return (0.0f > y || y >= WINDOW_HEIGHT) || (0.0f > x || x >= WINDOW_WIDTH);
 }
@@ -239,8 +239,6 @@ void player_init(void)
 
 void player_move_forward(f64 dt)
 {
-    if (game.view == VIEW_MENU) return;
-
     V2f old_pos = player.pos;
 
     player.pos = v2f_add(player.pos, v2f_scale(player.dir, dt * player.vel));
@@ -251,8 +249,6 @@ void player_move_forward(f64 dt)
 
 void player_move_backward(f64 dt)
 {
-    if (game.view == VIEW_MENU) return;
-
     V2f old_pos = player.pos;
 
     player.pos = v2f_sub(player.pos, v2f_scale(player.dir, dt * player.vel));
@@ -263,15 +259,11 @@ void player_move_backward(f64 dt)
 
 void player_rotate_clockwise(f64 dt)
 {
-    if (game.view == VIEW_MENU) return;
-
     player.dir = v2f_rotate(player.dir, radians_from_degrees(player.rotation_vel) * dt);
 }
 
 void player_rotate_counterclockwise(f64 dt)
 {
-    if (game.view == VIEW_MENU) return;
-
     player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
 }
 
@@ -664,26 +656,31 @@ internal void game_handle_pressed_keys(f64 dt)
     if (game.keyboard_state.key_escape.is_down && !game.keyboard_state.key_escape.was_down) {
         game_view_toggle_menu();
     }
-    if (game.keyboard_state.key_c.is_down && !game.keyboard_state.key_c.was_down) {
-        game_toggle_crosshair();
-    }
-    if (game.keyboard_state.key_n.is_down && !game.keyboard_state.key_n.was_down) {
-        game.map_index = next_map_index(game.map_index);
-    }
 
     //
 
-    if (game.keyboard_state.key_w.active) {
-        player_move_forward(dt);
-    }
-    if (game.keyboard_state.key_a.active) {
-        player_rotate_counterclockwise(dt);
-    }
-    if (game.keyboard_state.key_s.active) {
-        player_move_backward(dt);
-    }
-    if (game.keyboard_state.key_d.active) {
-        player_rotate_clockwise(dt);
+    if (game.view != VIEW_MENU) {
+        if (game.keyboard_state.key_n.is_down && !game.keyboard_state.key_n.was_down) {
+            next_map_index();
+        }
+        if (game.keyboard_state.key_c.is_down && !game.keyboard_state.key_c.was_down) {
+            game_toggle_crosshair();
+        }
+
+        //
+
+        if (game.keyboard_state.key_w.active) {
+            player_move_forward(dt);
+        }
+        if (game.keyboard_state.key_a.active) {
+            player_rotate_counterclockwise(dt);
+        }
+        if (game.keyboard_state.key_s.active) {
+            player_move_backward(dt);
+        }
+        if (game.keyboard_state.key_d.active) {
+            player_rotate_clockwise(dt);
+        }
     }
 }
 
