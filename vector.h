@@ -11,7 +11,7 @@ typedef struct {
 b32 v2f_zero(V2f a);
 b32 v2f_eq(V2f a, V2f b);
 
-V2f make_v2f(f32 x, f32 y);
+V2f v2f(f32 x, f32 y);
 V2f v2f_add(V2f a, V2f b);
 V2f v2f_sub(V2f a, V2f b);
 V2f v2f_unit(V2f a);

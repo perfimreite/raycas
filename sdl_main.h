@@ -14,8 +14,8 @@ typedef struct {
 
 typedef struct {
     Font *items;
-    u64 count;
-    u64 capacity;
+    u32 count;
+    u32 capacity;
 } Fonts;
 
 typedef struct {

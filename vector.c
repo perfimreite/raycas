@@ -18,7 +18,7 @@ b32 v2f_eq(V2f a, V2f b)
     return a.x == b.x && a.y == b.y;
 }
 
-V2f make_v2f(f32 x, f32 y)
+V2f v2f(f32 x, f32 y)
 {
     return (V2f){ .x = x, .y = y};
 }

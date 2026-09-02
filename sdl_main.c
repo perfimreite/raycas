@@ -122,19 +122,19 @@ void platform_draw_circle(Color color, V2f center, i32 radius, b32 filled)
         }
 
         if (filled) {
-            platform_draw_line(color, make_v2f(center.x + x, center.y + y), make_v2f(center.x - x, center.y + y));
-            platform_draw_line(color, make_v2f(center.x + x, center.y - y), make_v2f(center.x - x, center.y - y));
-            platform_draw_line(color, make_v2f(center.x + y, center.y + x), make_v2f(center.x - y, center.y + x));
-            platform_draw_line(color, make_v2f(center.x + y, center.y - x), make_v2f(center.x - y, center.y - x));
+            platform_draw_line(color, v2f(center.x + x, center.y + y), v2f(center.x - x, center.y + y));
+            platform_draw_line(color, v2f(center.x + x, center.y - y), v2f(center.x - x, center.y - y));
+            platform_draw_line(color, v2f(center.x + y, center.y + x), v2f(center.x - y, center.y + x));
+            platform_draw_line(color, v2f(center.x + y, center.y - x), v2f(center.x - y, center.y - x));
         }  else {
-            platform_draw_point(color, make_v2f(center.x + x, center.y + y));
-            platform_draw_point(color, make_v2f(center.x - x, center.y + y));
-            platform_draw_point(color, make_v2f(center.x + x, center.y - y));
-            platform_draw_point(color, make_v2f(center.x - x, center.y - y));
-            platform_draw_point(color, make_v2f(center.x + y, center.y + x));
-            platform_draw_point(color, make_v2f(center.x - y, center.y + x));
-            platform_draw_point(color, make_v2f(center.x + y, center.y - x));
-            platform_draw_point(color, make_v2f(center.x - y, center.y - x));
+            platform_draw_point(color, v2f(center.x + x, center.y + y));
+            platform_draw_point(color, v2f(center.x - x, center.y + y));
+            platform_draw_point(color, v2f(center.x + x, center.y - y));
+            platform_draw_point(color, v2f(center.x - x, center.y - y));
+            platform_draw_point(color, v2f(center.x + y, center.y + x));
+            platform_draw_point(color, v2f(center.x - y, center.y + x));
+            platform_draw_point(color, v2f(center.x + y, center.y - x));
+            platform_draw_point(color, v2f(center.x - y, center.y - x));
         }
     }
 }
@@ -153,10 +153,10 @@ void platform_draw_rect_rounded(Color color, Rect rect, i32 radius)
     platform_draw_rect(color, l_rect);
     platform_draw_rect(color, r_rect);
 
-    platform_draw_circle(color, make_v2f(i_rect.x, i_rect.y), radius, true);
-    platform_draw_circle(color, make_v2f(i_rect.x + i_rect.w - 1, i_rect.y), radius, true);
-    platform_draw_circle(color, make_v2f(i_rect.x, i_rect.y + i_rect.h - 1), radius, true);
-    platform_draw_circle(color, make_v2f(i_rect.x + i_rect.w - 1, i_rect.y + i_rect.h - 1), radius, true);
+    platform_draw_circle(color, v2f(i_rect.x, i_rect.y), radius, true);
+    platform_draw_circle(color, v2f(i_rect.x + i_rect.w - 1, i_rect.y), radius, true);
+    platform_draw_circle(color, v2f(i_rect.x, i_rect.y + i_rect.h - 1), radius, true);
+    platform_draw_circle(color, v2f(i_rect.x + i_rect.w - 1, i_rect.y + i_rect.h - 1), radius, true);
 }
 
 void platform_clear_backbuffer(Color color)
@@ -170,7 +170,7 @@ V2f platform_get_text_dims(i32 ptsize, const char *text)
     Font *font = get_font(ptsize);
     i32 w, h;
     platform_val_err(TTF_SizeUTF8(font->font, text, &w, &h));
-    V2f dims = make_v2f(w, h);
+    V2f dims = v2f(w, h);
     return dims;
 }
 
@@ -261,7 +261,7 @@ i32 main(void)
         frame_time.start = time_in_seconds();
 
         // reset keyboard keys
-        for (u64 i = 0; i < ARRAY_COUNT(game.keyboard_state.v); i++) {
+        for (u32 i = 0; i < ARRAY_COUNT(game.keyboard_state.v); i++) {
             Key *key = &game.keyboard_state.v[i];
 
             key->was_down = key->is_down;

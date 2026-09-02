@@ -71,8 +71,8 @@ typedef struct {
 
 typedef struct {
     V2f pos;
-    f64 perp_wall_dist;
-    b32 vertical;
+    f32 perp_wall_dist;
+    b32 horizontal;
     u32 map_tile_value;
 } Intersect;
 
@@ -84,10 +84,10 @@ typedef enum {
 
 typedef struct {
     u32 id;
-    Color average_color;
+    Color tile_color;
     u32 *data;
-    u64 width;
-    u64 height;
+    u32 width;
+    u32 height;
 
     char *name;
 } Texture;
