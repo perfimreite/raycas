@@ -18,21 +18,23 @@ typedef struct {
     u8 a;
 } Color;
 
-typedef enum {
-    BOX_STYLE_SQUARED,
-    BOX_STYLE_ROUNDED,
-} Box_Style;
+typedef u32 Box_Style_Flag;
+enum {
+    BOX_STYLE_FLAG_ROUNDED = (1<<0),
+    BOX_STYLE_FLAG_BORDER  = (1<<1),
+    BOX_STYLE_FLAG_ALL     = 0x00FFFFFF,
+};
 
 typedef struct {
-    // TODO: text align left, right, top, bottom.
     const char *text;
     i32 ptsize;
-
     Rect rect;
-    Box_Style style;
+    Box_Style_Flag style_flag;
     Color fg;
     Color bg;
-    // Color border;
+    Color border_color;
+    i32 border_radius;
+    i32 border_thickness;
 } Box;
 
 typedef struct {
@@ -40,19 +42,6 @@ typedef struct {
     b32 hovered;
     Box box;
 } Button;
-
-typedef union {
-    // TODO: weird approach and only fits a very spesific purpouse.
-
-    Button v[2];
-    struct {
-        Button start;
-        Button quit;
-
-        // NOTE: All buttons must come before `button_end`
-        Button button_end;
-    };
-} Buttons;
 
 typedef enum {
     OVERLAY_STATE_HIDDEN,
@@ -80,28 +69,22 @@ typedef struct {
     Color color;
 } Player;
 
-typedef enum {
-    MAP_TILE_EMPTY,
-    MAP_TILE_WALL,
-    MAP_TILE_TEXTURE
-} Map_Tile_Kind;
-
 typedef struct {
     V2f pos;
     f64 perp_wall_dist;
     b32 vertical;
-    b32 perim;
-    Map_Tile_Kind map_tile_kind;
+    u32 map_tile_value;
 } Intersect;
 
 typedef enum {
     VIEW_GAME,
     VIEW_MAP,
     VIEW_MENU,
-    _view_count
 } View;
 
 typedef struct {
+    u32 id;
+    Color average_color;
     u32 *data;
     u64 width;
     u64 height;
@@ -164,7 +147,16 @@ typedef union {
 } Keyboard_State;
 
 typedef struct {
-    Buttons buttons;
+    union {
+        Button v[2];
+        struct {
+            Button start;
+            Button quit;
+
+            // NOTE: All buttons must come before `button_end`
+            Button button_end;
+        };
+    } buttons;
     Color bg;
 } Menu;
 

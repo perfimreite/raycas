@@ -1,5 +1,8 @@
 #include "base.h"
 
+#if defined(_WIN32)
+    #define _USE_MATH_DEFINES
+#endif
 #include <math.h>
 #include <time.h>
 

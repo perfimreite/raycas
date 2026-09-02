@@ -1,5 +1,15 @@
 #include "utils.h"
 
+#if defined(_WIN32)
+    #define _USE_MATH_DEFINES
+#endif
+#include <math.h>
+#ifndef M_PI
+    #define M_PI 3.14159265358979323846
+#endif
+
+#include <time.h>
+
 f64 time_in_seconds(void)
 {
     struct timespec ts;

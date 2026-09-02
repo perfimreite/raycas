@@ -1,6 +1,14 @@
 #include "game.h"
 #include "utils.h"
 
+#if defined(_WIN32)
+    #define _USE_MATH_DEFINES
+#endif
+#include <math.h>
+#ifndef M_PI
+    #define M_PI_2 1.57079632679489661923
+#endif
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "thirdparty/stb_image.h"
 
@@ -8,8 +16,8 @@
 
 global const Color black             = { .r = 0  , .g = 0  , .b = 0  , .a = 255 };
 global const Color white             = { .r = 255, .g = 255, .b = 255, .a = 255 };
-global const Color gray              = { .r = 127, .g = 127, .b = 127, .a = 255 };
-global const Color light_gray        = { .r = 63 , .g = 63 , .b = 63 , .a = 255 };
+global const Color light_gray        = { .r = 127, .g = 127, .b = 127, .a = 255 };
+global const Color gray              = { .r = 63 , .g = 63 , .b = 63 , .a = 255 };
 global const Color red               = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
 global const Color green             = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
 global const Color blue              = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
@@ -27,68 +35,76 @@ Game game              = {0};
 
 global i32 map[MAP_COUNT][ROWS][COLS] = {
     {
-        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
-        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
-        {1, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 1, 1, 1, 0, 0},
-        {0, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 1, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0},
-        {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-        {0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
-        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1},
+        {1, 3, 0, 0, 0, 0, 2, 2, 0, 0, 0, 1, 1, 1, 0, 1},
+        {1, 3, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 3, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 3, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1},
+        {1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
     },
     {
-        {1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0},
-        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0},
-        {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
-        {0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1},
+        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1},
+        {1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
+        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
     }
 };
 
-internal void next_map_index()
+internal void next_map_index(void)
 {
     game.map_index = (game.map_index + 1) % MAP_COUNT;
 }
 
-internal Map_Tile_Kind get_map_tile(i32 map_index, f32 x, f32 y)
+internal u32 get_map_tile(f32 x, f32 y)
 {
     i32 cy = y / CELL_SIZE;
     i32 cx = x / CELL_SIZE;
     assert(cy >= 0);
     assert(cx >= 0);
-    return map[map_index][cy][cx];
+    return map[game.map_index][cy][cx];
 }
 
-internal b32 is_wall(i32 map_index, f32 x, f32 y)
+internal b32 is_wall(f32 x, f32 y)
 {
-    return get_map_tile(map_index, x, y) == MAP_TILE_WALL;
+    return get_map_tile(x, y) >= 1;
 }
 
-internal b32 is_texture(i32 map_index, f32 x, f32 y)
+internal inline Color color_from_u32(u32 color)
 {
-    return get_map_tile(map_index, x, y) == MAP_TILE_TEXTURE;
+    return (Color) {
+        .b = color >> (8*0) & 0xFF,
+        .g = color >> (8*1) & 0xFF,
+        .r = color >> (8*2) & 0xFF,
+        .a = color >> (8*3) & 0xFF,
+    };
 }
 
-internal b32 is_perim(f32 x, f32 y)
+internal inline u32 u32_from_color(Color color)
 {
-    return (0.0f > y || y >= WINDOW_HEIGHT) || (0.0f > x || x >= WINDOW_WIDTH);
+    // u32 color format: 0xAARRGGBB
+    return (u32)color.b << (8*0) |
+           (u32)color.g << (8*1) |
+           (u32)color.r << (8*2) |
+           (u32)color.a << (8*3);
 }
 
-internal Texture get_fallback_texture()
+internal Texture get_fallback_texture(void)
 {
     Texture texture = {0};
-
     texture.width = DEFAULT_TEXTURE_WIDTH;
     texture.height = DEFAULT_TEXTURE_HEIGHT;
     texture.data = malloc(sizeof(u32) * DEFAULT_TEXTURE_WIDTH * DEFAULT_TEXTURE_HEIGHT);
@@ -115,8 +131,54 @@ internal Texture get_fallback_texture()
     return texture;
 }
 
-internal Texture load_texture_from_file(const char *file_path, char *name)
+internal char *get_file_name_from_path(const char *path)
 {
+    size_t len = strlen(path);
+    char *file_name = malloc(len + 1);
+
+    size_t j = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (path[i] == '/') {
+            file_name = &file_name[j+1];
+            j = 0;
+            continue;
+        } else if (path[i] == '.') {
+            break;
+        }
+        file_name[j++] = path[i];
+    }
+
+    file_name[j] = '\0';
+    return file_name;
+}
+
+internal u32 get_average_from_pixels(u32 pixels[], u64 size)
+{
+    u32 b = 0;
+    u32 g = 0;
+    u32 r = 0;
+    u32 a = 0;
+
+    for (u64 i = 0; i < size; i++) {
+        b += pixels[i] >> (8*0) & 0xFF;
+        g += pixels[i] >> (8*1) & 0xFF;
+        r += pixels[i] >> (8*2) & 0xFF;
+        a += pixels[i] >> (8*3) & 0xFF;
+    }
+
+    b /= size;
+    g /= size;
+    r /= size;
+    a /= size;
+
+    u32 color = b << (8*0) | g << (8*1) | r << (8*2) | a << (8*3);
+
+    return color;
+}
+
+internal Texture load_texture_from_file(const char *file_path)
+{
+    local_persist int id = 2;
     Texture texture = {0};
 
     FILE *file = fopen(file_path, "rb");
@@ -129,8 +191,7 @@ internal Texture load_texture_from_file(const char *file_path, char *name)
             texture.data = (u32 *)data;
             texture.width = width;
             texture.height = height;
-            // TODO: Should be able to get name from file_path
-            texture.name = name;
+            texture.name = get_file_name_from_path(file_path);
 
             for (u64 i = 0; i < texture.width * texture.height; i++) {
                 // Swap blue and red bytes to match color interpretation of `Color`
@@ -144,10 +205,10 @@ internal Texture load_texture_from_file(const char *file_path, char *name)
         fclose(file);
     } else {
         fprintf(stderr, "ERROR: Failed to load texture: `%s`\n", file_path);
-
-        // Fallback in case of error trying to read from file
         texture = get_fallback_texture();
     }
+    texture.id = id++;
+    texture.average_color = color_from_u32(get_average_from_pixels(texture.data, texture.width * texture.height));
 
     return texture;
 }
@@ -162,48 +223,59 @@ Rect make_rect(u32 x, u32 y, u32 w, u32 h)
     };
 }
 
+Rect rect_shrink(Rect rect, i32 k)
+{
+    return make_rect(rect.x + k, rect.y + k, rect.w - 2 * k, rect.h - 2 * k);
+}
+
 internal Box make_box(const char *text, i32 ptsize, Rect rect,
-                      Box_Style box_style, Color fg, Color bg)
+                      Box_Style_Flag box_style_flag, Color fg, Color bg,
+                      Color border_color, i32 border_radius, i32 border_thickness)
 {
     return (Box) {
         .text = text,
         .ptsize = ptsize,
-
         .rect = rect,
-        .style = box_style,
+        .style_flag = box_style_flag,
         .fg = fg,
         .bg = bg,
+        .border_color = border_color,
+        .border_radius = border_radius,
+        .border_thickness = border_thickness
     };
 }
 
 internal Button make_button(const char *text, i32 ptsize, Rect rect,
-                            Box_Style box_style, Color fg, Color bg)
+                            Box_Style_Flag box_style_flag, Color fg, Color bg,
+                            Color border_color, i32 border_radius, i32 border_thickness)
 {
     return (Button) {
         .pressed = false,
-        .box = make_box(text, ptsize, rect, box_style, fg, bg)
+        .box = make_box(text, ptsize, rect, box_style_flag,
+                        fg, bg, border_color, border_radius, border_thickness)
     };
 }
 
-internal Buttons create_menu_buttons(void)
+internal Menu create_menu(void)
 {
+    Menu menu = {0};
+    menu.bg = light_gray;
+
     Button start = make_button("START", 32,
                                make_rect(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y - 120, 200, 80),
-                               BOX_STYLE_ROUNDED,
-                               white, blue);
+                               BOX_STYLE_FLAG_ROUNDED | BOX_STYLE_FLAG_BORDER,
+                               white, blue, black, 16, 4);
     Button quit = make_button("QUIT", 32,
                               make_rect(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y + 40, 200, 80),
-                              BOX_STYLE_ROUNDED,
-                              white, red);
-
-    Buttons buttons = {0};
-    buttons.v[0] = start;
-    buttons.v[1] = quit;
+                              BOX_STYLE_FLAG_ROUNDED | BOX_STYLE_FLAG_BORDER,
+                              white, red, black, 16, 4);
+    menu.buttons.v[0] = start;
+    menu.buttons.v[1] = quit;
 
     // Check that right amount of buttons are in union
-    ASSERT(&buttons.button_end - &buttons.v[0] == ARRAY_COUNT(buttons.v));
+    ASSERT(&menu.buttons.button_end - &menu.buttons.v[0] == ARRAY_COUNT(menu.buttons.v));
 
-    return buttons;
+    return menu;
 }
 
 void overlay_init(void)
@@ -222,7 +294,7 @@ internal inline void overlay_update_message(Overlay *overlay, u32 fps, V2f playe
     ASSERT(bytes_written < OVERLAY_TEXT_SIZE);
 }
 
-internal void overlay_next_state()
+internal void overlay_next_state(void)
 {
     overlay.state = (overlay.state + 1) % _overlay_state_count;
 }
@@ -245,7 +317,7 @@ void player_move_forward(f64 dt)
     V2f old_pos = player.pos;
 
     player.pos = v2f_add(player.pos, v2f_scale(player.dir, dt * player.vel));
-    if (is_perim(player.pos.x, player.pos.y) || is_wall(game.map_index, player.pos.x, player.pos.y)) {
+    if (is_wall(player.pos.x, player.pos.y)) {
         player.pos = old_pos;
     }
 }
@@ -255,7 +327,7 @@ void player_move_backward(f64 dt)
     V2f old_pos = player.pos;
 
     player.pos = v2f_sub(player.pos, v2f_scale(player.dir, dt * player.vel));
-    if (is_perim(player.pos.x, player.pos.y) || is_wall(game.map_index, player.pos.x, player.pos.y)) {
+    if (is_wall(player.pos.x, player.pos.y)) {
         player.pos = old_pos;
     }
 }
@@ -270,15 +342,20 @@ void player_rotate_counterclockwise(f64 dt)
     player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
 }
 
-internal void draw_walls(Color color)
+internal void draw_walls()
 {
     for (u64 y = 0; y < game.height; y += CELL_SIZE) {
         for (u64 x = 0; x < game.width; x += CELL_SIZE) {
             Rect rect = make_rect(x, y, CELL_SIZE, CELL_SIZE);
-            if (is_wall(game.map_index, x, y)) {
-                platform_draw_rect(color, rect);
-            } else if (is_texture(game.map_index, x, y)) {
-                platform_draw_rect(red, rect);
+            if (is_wall(x, y)) {
+                u32 map_tile_value = get_map_tile(x, y);
+                if (map_tile_value == 1) {
+                    platform_draw_rect(light_gray, rect);
+                } else {
+                    u32 index = map_tile_value - FIRST_TEXTURE_ID;
+                    Texture texture = LIST_GET(game.textures, index);
+                    platform_draw_rect(texture.average_color, rect);
+                }
             }
         }
     }
@@ -295,34 +372,32 @@ internal void draw_grid(Color color)
     }
 }
 
-// TODO: make this function faster as
-// it takes up much of the frame time
-internal Intersect find_intersect(V2f pos, V2f dir)
+internal Intersect get_intersect(V2f pos, V2f ray_dir)
 {
     V2f delta_dist = make_v2f(0, 0);
     V2f step       = make_v2f(0, 0);
     V2f side_dist  = make_v2f(0, 0);
 
-    delta_dist.x = dir.x == 0 ? 1e30 : fabs(1.0f / dir.x);
-    delta_dist.y = dir.y == 0 ? 1e30 : fabs(1.0f / dir.y);
+    delta_dist.x = ray_dir.x == 0 ? 1e30 : fabs(1.0f / ray_dir.x);
+    delta_dist.y = ray_dir.y == 0 ? 1e30 : fabs(1.0f / ray_dir.y);
 
     V2f tile_relative_pos = v2f_scale(pos, 1.0f / CELL_SIZE);
-    V2f map = v2f_floor(tile_relative_pos);
+    V2f map_tile = v2f_floor(tile_relative_pos);
 
-    if (dir.x < 0) {
+    if (ray_dir.x < 0) {
         step.x = -1;
-        side_dist.x = (tile_relative_pos.x - map.x) * delta_dist.x;
+        side_dist.x = (tile_relative_pos.x - map_tile.x) * delta_dist.x;
     } else {
         step.x = 1;
-        side_dist.x = (map.x + 1.0f - tile_relative_pos.x) * delta_dist.x;
+        side_dist.x = (map_tile.x + 1.0f - tile_relative_pos.x) * delta_dist.x;
     }
 
-    if (dir.y < 0) {
+    if (ray_dir.y < 0) {
         step.y = -1;
-        side_dist.y = (tile_relative_pos.y - map.y) * delta_dist.y;
+        side_dist.y = (tile_relative_pos.y - map_tile.y) * delta_dist.y;
     } else {
         step.y = 1;
-        side_dist.y = (map.y + 1.0f - tile_relative_pos.y) * delta_dist.y;
+        side_dist.y = (map_tile.y + 1.0f - tile_relative_pos.y) * delta_dist.y;
     }
 
     Intersect intersect = {0};
@@ -330,32 +405,26 @@ internal Intersect find_intersect(V2f pos, V2f dir)
     for (;;) {
         if (side_dist.x < side_dist.y) {
             side_dist.x += delta_dist.x;
-            map.x += step.x;
-            intersect.vertical = false;
+            map_tile.x += step.x;
+            intersect.vertical = true;
         } else {
             side_dist.y += delta_dist.y;
-            map.y += step.y;
-            intersect.vertical = true;
+            map_tile.y += step.y;
+            intersect.vertical = false;
         }
 
-        V2f map_pos = v2f_scale(map, CELL_SIZE);
-        if (is_perim(map_pos.x, map_pos.y)) {
-            intersect.perim = true;
-            break;
-        }
-        if (is_wall(game.map_index, map_pos.x, map_pos.y)) {
-            intersect.map_tile_kind = MAP_TILE_WALL;
-            break;
-        }
-        if (is_texture(game.map_index, map_pos.x, map_pos.y)) {
-            intersect.map_tile_kind = MAP_TILE_TEXTURE;
+        V2f map_pos = v2f_scale(map_tile, CELL_SIZE);
+        if (is_wall(map_pos.x, map_pos.y)) {
+            intersect.map_tile_value = get_map_tile(map_pos.x, map_pos.y);
             break;
         }
     }
 
-    intersect.perp_wall_dist =
-        (intersect.vertical ? (side_dist.y - delta_dist.y) : (side_dist.x - delta_dist.x)) * CELL_SIZE;
-    intersect.pos = v2f_add(pos, v2f_scale(dir, intersect.perp_wall_dist));
+
+    intersect.perp_wall_dist = (intersect.vertical ?
+                                side_dist.x - delta_dist.x :
+                                side_dist.y - delta_dist.y) * CELL_SIZE;
+    intersect.pos = v2f_add(pos, v2f_scale(ray_dir, intersect.perp_wall_dist));
     return intersect;
 }
 
@@ -370,25 +439,6 @@ internal void draw_crosshair(Color color)
                        make_v2f(WINDOW_CENTER_X + l, WINDOW_CENTER_Y));
 }
 
-internal inline Color color_from_u32(u32 color)
-{
-    return (Color) {
-        .b = color >> (8*0) & 0xFF,
-        .g = color >> (8*1) & 0xFF,
-        .r = color >> (8*2) & 0xFF,
-        .a = color >> (8*3) & 0xFF,
-    };
-}
-
-internal inline u32 u32_from_color(Color color)
-{
-    // u32 color format: 0xAARRGGBB
-    return (u32)color.b << (8*0) |
-           (u32)color.g << (8*1) |
-           (u32)color.r << (8*2) |
-           (u32)color.a << (8*3);
-}
-
 internal void draw_3d_view(Player player)
 {
     f32 angle_curr  = -player.fov / 2.0f;
@@ -396,73 +446,59 @@ internal void draw_3d_view(Player player)
     f32 angle_step  =  player.fov / (game.width - 1);
     for (u64 x = 0; angle_curr <= angle_end; angle_curr += angle_step, x++) {
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
-        Intersect intersect = find_intersect(player.pos, curr_dir);
+        Intersect intersect = get_intersect(player.pos, curr_dir);
         f32 wall_height = game.height * WALL_HEIGHT_MULTIPLIER / intersect.perp_wall_dist;
 
         Color sky_color = light_blue;
-        Color wall_color = intersect.perim ? black : (intersect.vertical ? gray : light_gray);
+        Color wall_color = intersect.vertical ? light_gray : gray;
 
         f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
         V2f window_start = make_v2f(x, 0);
         V2f wall_start = make_v2f(x, wall_top);
         platform_draw_line(sky_color, window_start, wall_start);
 
-        switch (intersect.map_tile_kind) {
-            case MAP_TILE_EMPTY:
-            case MAP_TILE_WALL: {
-                f32 wall_bottom = CLAMP(( wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
-                V2f wall_end = make_v2f(x, wall_bottom);
-                platform_draw_line(wall_color, wall_start, wall_end);
-            } break;
+        if (intersect.map_tile_value == 1) {
+            f32 wall_bottom = CLAMP(( wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
+            V2f wall_end = make_v2f(x, wall_bottom);
+            platform_draw_line(wall_color, wall_start, wall_end);
+        } else {
+            u32 index = intersect.map_tile_value - FIRST_TEXTURE_ID;
+            Texture texture = LIST_GET(game.textures, index);
 
-            // TODO: make this case faster as
-            // it takes up much of the frame time
-            //
-            // rotate texture matrix and switch x and y when selecting pixel?
-            case MAP_TILE_TEXTURE: {
-                f32 wall_x =
-                    intersect.vertical ?
-                    player.pos.x + intersect.perp_wall_dist * curr_dir.x :
-                    player.pos.y + intersect.perp_wall_dist * curr_dir.y;
-                wall_x -= floor(wall_x);
+            f32 wall_x = intersect.vertical ?
+                player.pos.y + (intersect.perp_wall_dist / WALL_HEIGHT_MULTIPLIER) * curr_dir.y :
+                player.pos.x + (intersect.perp_wall_dist / WALL_HEIGHT_MULTIPLIER) * curr_dir.x;
+            wall_x -= floor(wall_x);
+            V2f texture_index = make_v2f(0, 0);
 
-                // Get texture
-                // TODO: Should not be hardcoded to "redbrick".
-                Texture texture = {0};
-                LIST_FOR_EACH(Texture, game.textures, t) {
-                    if (strcmp(t->name, "redbrick") == 0) {
-                        texture = *t;
-                    }
-                }
-                ASSERT(texture.name != NULL);
+            texture_index.x = wall_x * texture.width;
+            if ((intersect.vertical && curr_dir.x > 0) || (!intersect.vertical && curr_dir.y < 0)) {
+                texture_index.x = texture.width - texture_index.x - 1;
+            }
 
-                V2f texture_index = make_v2f(0, 0);
+            f64 step = texture.height / wall_height;
+            f64 texture_pos = (wall_top - game.height / 2.0 + wall_height / 2.0) * step;
 
-                texture_index.x = (u32)(wall_x * texture.width);
-                if ((!intersect.vertical && curr_dir.x > 0) || (intersect.vertical && curr_dir.y < 0)) {
-                    texture_index.x = texture.width - texture_index.x - 1;
-                }
-
-                f32 step = texture.height / wall_height;
-                f32 texture_pos = (wall_top - game.height / 2.0 + wall_height / 2.0) * step;
-
+            if (intersect.vertical) {
                 for (u64 y = 0; y < wall_height; y++, texture_pos += step) {
-                    texture_index.y = (u32)texture_pos & (texture.height - 1);
+                    texture_index.y = (i32)texture_pos & (texture.height - 1);
 
-                    // FIXME: pixels are being pulled out so that the texture is rotated 90 degrees
-                    // Solution might be to switch x and why in the loop
-                    //
-                    // DONE(?)
-                    // u32 pixel = texture.data[texture.height * (u32)texture_index.x + (u32)texture_index.y];
-                    u32 pixel = texture.data[texture.height * (u32)texture_index.y + (u32)texture_index.x];
-                    if (intersect.vertical) {
-                        pixel = (pixel >> 1) & 8355711;
-                    }
+                    u32 pixel = texture.data[(i32)(texture.height * texture_index.y + texture_index.x)];
                     Color color = color_from_u32(pixel);
 
                     platform_draw_point(color, make_v2f(x, wall_top + y));
                 }
-            } break;
+            } else {
+                for (u64 y = 0; y < wall_height; y++, texture_pos += step) {
+                    texture_index.y = (i32)texture_pos & (texture.height - 1);
+
+                    u32 pixel = texture.data[(i32)(texture.height * texture_index.y + texture_index.x)];
+                    pixel = (pixel >> 1) & 8355711;
+                    Color color = color_from_u32(pixel);
+
+                    platform_draw_point(color, make_v2f(x, wall_top + y));
+                }
+            }
         }
     }
 
@@ -483,7 +519,7 @@ internal void draw_player_fov(Color color, Player player, u32 beam_spread)
     f32 angle_step  =  player.fov / (game.width - 1) * beam_spread;
     for (u64 buffer_x; angle_curr <= angle_end; angle_curr += angle_step, buffer_x++) {
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
-        Intersect intersect = find_intersect(player.pos, curr_dir);
+        Intersect intersect = get_intersect(player.pos, curr_dir);
 
         platform_draw_line(color, player.pos, intersect.pos);
     }
@@ -491,25 +527,31 @@ internal void draw_player_fov(Color color, Player player, u32 beam_spread)
 
 internal void draw_map(Player player)
 {
-    draw_walls(gray);
+    draw_walls();
     draw_grid(black);
 
     draw_player(player);
     draw_player_fov(black_transparent, player, 8);
 }
 
-internal void draw_minimap_walls(Color color, f32 scale)
+internal void draw_minimap_walls(f32 scale)
 {
     f32 scaled_cell_size = CELL_SIZE * scale;
 
     for (u64 y = game.minimap_dims.y; y < game.minimap_dims.y + game.minimap_dims.h; y += scaled_cell_size) {
         for (u64 x = game.minimap_dims.x; x < game.minimap_dims.x + game.minimap_dims.w; x += scaled_cell_size) {
-            if (is_wall(game.map_index, (x - game.minimap_dims.x) / scale, (y - game.minimap_dims.y) / scale)) {
+            if (is_wall((x - game.minimap_dims.x) / scale, (y - game.minimap_dims.y) / scale)) {
                 Rect rect = make_rect(x, y, scaled_cell_size, scaled_cell_size);
-                platform_draw_rect(color, rect);
-            } else if (is_texture(game.map_index, (x - game.minimap_dims.x) / scale, (y - game.minimap_dims.y) / scale)) {
-                Rect rect = make_rect(x, y, scaled_cell_size, scaled_cell_size);
-                platform_draw_rect(red, rect);
+                u32 map_tile_value =
+                    get_map_tile((x - game.minimap_dims.x) * CELL_SIZE / scaled_cell_size,
+                                 (y - game.minimap_dims.y) * CELL_SIZE / scaled_cell_size);
+                if (map_tile_value == 1) {
+                    platform_draw_rect(light_gray, rect);
+                } else {
+                    u32 index = map_tile_value - FIRST_TEXTURE_ID;
+                    Texture texture = LIST_GET(game.textures, index);
+                    platform_draw_rect(texture.average_color, rect);
+                }
             }
         }
     }
@@ -534,7 +576,7 @@ internal void draw_minimap(Player player)
 
     platform_draw_rect(green, game.minimap_dims);
 
-    draw_minimap_walls(gray, scale);
+    draw_minimap_walls(scale);
     draw_minimap_grid(black, scale);
 
     V2f player_minimap_pos = v2f_add(v2f_scale(player.pos, scale), make_v2f(game.minimap_dims.x, game.minimap_dims.y));
@@ -543,23 +585,29 @@ internal void draw_minimap(Player player)
 
 internal void draw_box(Box box)
 {
-    switch (box.style) {
-        default: {} break;
-
-        case BOX_STYLE_SQUARED: {
+    if (box.style_flag & BOX_STYLE_FLAG_BORDER) {
+        if (box.style_flag & BOX_STYLE_FLAG_ROUNDED) {
+            platform_draw_rect_rounded(box.border_color, box.rect, box.border_radius);
+            platform_draw_rect_rounded(box.bg, rect_shrink(box.rect, 4), box.border_radius);
+        } else {
+            platform_draw_rect(box.border_color, box.rect);
+            platform_draw_rect(box.bg, rect_shrink(box.rect, 4));
+        }
+    } else {
+        if (box.style_flag & BOX_STYLE_FLAG_ROUNDED) {
+            platform_draw_rect_rounded(box.bg, box.rect, box.border_radius);
+        } else {
             platform_draw_rect(box.bg, box.rect);
-        } break;
-
-        case BOX_STYLE_ROUNDED: {
-            platform_draw_rect_rounded(box.bg, box.rect, 20);
-        } break;
+        }
     }
 
-    Rect text_rect = platform_center_text_in_rect(box.rect, box.ptsize, box.text);
-    platform_draw_text(box.fg, box.bg, text_rect, box.text, box.ptsize);
+    if (box.text != NULL && strcmp(box.text, "") != 0) {
+        Rect text_rect = platform_center_text_in_rect(box.rect, box.ptsize, box.text);
+        platform_draw_text(box.fg, box.bg, text_rect, box.text, box.ptsize);
+    }
 }
 
-internal void draw_menu()
+internal void draw_menu(void)
 {
     for (u64 i = 0; i < ARRAY_COUNT(game.menu.buttons.v); i++) {
         draw_box(game.menu.buttons.v[i].box);
@@ -573,7 +621,7 @@ internal void draw_overlay(Overlay overlay)
     platform_draw_text(white, black_transparent, overlay.rect, overlay.text, overlay.ptsize);
 }
 
-void game_init()
+void game_init(void)
 {
     game.quit = false;
 
@@ -601,13 +649,19 @@ void game_init()
     game.quit = false;
 
     game.textures = (Textures){0};
-    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"redbrick.png", "redbrick"));
-    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"mossy.png",    "mossy"));
-    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"wood.png",     "wood"));
-    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"barrel.png",   "barrel"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"redbrick.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"bluestone.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"colorstone.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"eagle.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"greystone.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"mossy.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"purplestone.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"wood.png"));
+    // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"greenlight.png"));
+    // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"barrel.png"));
+    // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"pillar.png"));
 
-    game.menu.buttons = create_menu_buttons();
-    game.menu.bg = gray;
+    game.menu = create_menu();
 }
 
 internal void game_view_toggle_map(void)
@@ -634,7 +688,6 @@ internal void game_toggle_crosshair(void)
     game.show_crosshair = !game.show_crosshair;
 }
 
-// NOTE: returns false if quit button is pressed
 void game_process_mouse(void)
 {
     for (u64 i = 0; i < ARRAY_COUNT(game.menu.buttons.v); i++) {

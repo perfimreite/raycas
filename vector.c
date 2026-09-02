@@ -1,6 +1,9 @@
 #include "constants.h"
 #include "vector.h"
 
+#if defined(_WIN32)
+    #define _USE_MATH_DEFINES
+#endif
 #include <math.h>
 
 V2f zero_vector = { .x = 0, .y = 0 };

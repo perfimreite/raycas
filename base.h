@@ -71,9 +71,19 @@ typedef int32_t  b32;
     } while (0)
 
 #define LIST_POP(list) \
-    (list).items[--(list).count]
+    (list).items[(ASSERT((list).count > 0), --(list).count)]
+
+#define LIST_LAST(list) \
+    (list).items[(ASSERT((list).count > 0), (list).count - 1)]
+
+#define LIST_FIRST(list) \
+    (list).items[0]
+
+#define LIST_GET(list, idx) \
+    (list).items[(ASSERT(idx < (list).count), (idx))]
 
 #define LIST_FOR_EACH(T, list, el) \
     for (T *(el) = (list).items; (el) < &(list).items[(list).count]; (el)++)
 
 #endif // BASE_H
+

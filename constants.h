@@ -31,7 +31,7 @@ static_assert(WINDOW_WIDTH / COLS == WINDOW_HEIGHT / ROWS);
 
 #define FONT_FILE "fonts/CascadiaMono.ttf"
 #define TEXTURES_PATH "assets/wolfenstein_textures/"
-#define MAX_FONT_COUNT 32
+#define FIRST_TEXTURE_ID 2
 
 #endif // CONSTANTS_H
 

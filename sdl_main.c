@@ -1,27 +1,7 @@
-#include "base.h"
+#include "sdl_main.h"
 #include "utils.h"
 #include "vector.h"
 #include "game.h"
-
-#include <SDL2/SDL_mouse.h>
-#include <SDL2/SDL_pixels.h>
-#include <SDL2/SDL_rect.h>
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
-
-// TODO: Consider moving types into main.h
-
-typedef struct {
-    const char *path;
-    i32 ptsize;
-    TTF_Font *font;
-} Font;
-
-typedef struct {
-    Font *items;
-    u64 count;
-    u64 capacity;
-} Fonts;
 
 global Fonts fonts = {0};
 
@@ -36,21 +16,14 @@ internal Font font_init(const char *path, i32 ptsize)
 
 internal Font *get_font(i32 ptsize)
 {
-    ASSERT(fonts.count <= fonts.capacity);
-
-    if (fonts.capacity == 0) {
-        fonts.capacity = MAX_FONT_COUNT;
-        fonts.items = malloc(fonts.capacity * sizeof(Font));
-    }
-
-    for (u64 i = 0; i < fonts.count; i++) {
-        if (fonts.items[i].ptsize == ptsize) {
-            return &fonts.items[i];
+    LIST_FOR_EACH(Font, fonts, font) {
+        if (font->ptsize == ptsize) {
+            return font;
         }
     }
 
-    fonts.items[fonts.count++] = font_init(FONT_FILE, ptsize);
-    return &fonts.items[fonts.count-1];
+    LIST_PUSH(fonts, font_init(FONT_FILE, ptsize));
+    return &LIST_LAST(fonts);
 }
 
 global SDL_Window *window = NULL;
@@ -237,12 +210,6 @@ b32 platform_point_in_rect(V2f point, Rect rect)
     SDL_Rect sdl_rect = translate_rect(rect);
     return SDL_PointInRect(&sdl_point, &sdl_rect);
 }
-
-typedef struct {
-    f64 start;
-    f64 end;
-    f64 dt;
-} Frame_Time;
 
 internal void platform_process_key(Key *key, b32 repeat)
 {
