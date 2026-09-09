@@ -106,3 +106,68 @@
 //     return (0 > y || y >= ROWS) || (0 > x || x >= COLS);
 // }
 
+// internal void draw_3d_view(Player player)
+// {
+//     f32 angle_curr  = -player.fov / 2.0f;
+//     f32 angle_step  =  player.fov / (game.width - 1);
+//     for (u32 x = 0; x < game.width; x++) {
+//         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
+//         Intersect intersect = get_intersect(player.pos, curr_dir);
+//         f32 wall_height = game.height / intersect.perp_wall_dist;
+//
+//         f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
+//         V2f window_start = v2f(x, 0);
+//         V2f wall_start = v2f(x, wall_top);
+//         platform_draw_line(light_blue, window_start, wall_start);
+//
+//         if (intersect.map_tile_value == 1) {
+//             f32 wall_bottom = CLAMP((wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
+//             V2f wall_end = v2f(x, wall_bottom);
+//             Color wall_color = intersect.horizontal ? light_gray : gray;
+//             platform_draw_line(wall_color, wall_start, wall_end);
+//         } else {
+//             Texture texture = get_texture_from_mtv(intersect.map_tile_value);
+//
+//             f32 wall_x = intersect.horizontal ?
+//                 player.pos.x + intersect.perp_wall_dist * curr_dir.x :
+//                 player.pos.y + intersect.perp_wall_dist * curr_dir.y;
+//             wall_x -= floor(wall_x);
+//             V2f texture_index = v2f(0, 0);
+//
+//             texture_index.x = texture.width - 1 - (i32)(wall_x * texture.width);
+//             if ((!intersect.horizontal && curr_dir.x > 0) || (intersect.horizontal && curr_dir.y < 0)) {
+//                 texture_index.x = texture.width - texture_index.x - 1;
+//             }
+//
+//             f32 step = texture.height / wall_height;
+//             f32 texture_pos = (wall_top - game.height / 2.0 + wall_height / 2.0) * step;
+//
+//             if (intersect.horizontal) {
+//                 for (u32 y = wall_top; y < wall_height + wall_top; y++, texture_pos += step) {
+//                     texture_index.y = (i32)texture_pos & (texture.height - 1);
+//
+//                     u32 pixel = texture.data[(i32)(texture.height * texture_index.x + texture_index.y)];
+//                     pixel = (pixel >> 1) & 8355711;
+//                     Color color = color_from_u32(pixel);
+//
+//                     platform_draw_point(color, v2f(x, y));
+//                 }
+//             } else {
+//                 for (u32 y = wall_top; y < wall_height + wall_top; y++, texture_pos += step) {
+//                     texture_index.y = (i32)texture_pos & (texture.height - 1);
+//
+//                     u32 pixel = texture.data[(i32)(texture.height * texture_index.x + texture_index.y)];
+//                     Color color = color_from_u32(pixel);
+//
+//                     platform_draw_point(color, v2f(x, y));
+//                 }
+//             }
+//         }
+//
+//         angle_curr += angle_step;
+//     }
+//
+//     if (game.show_crosshair) {
+//         draw_crosshair(game.crosshair_color);
+//     }
+// }

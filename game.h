@@ -88,6 +88,7 @@ typedef struct {
 typedef struct {
     V2f pos;
     V2f dir;
+    V2f camera_plane;
 
     i32 vel;
     i32 rotation_vel;
@@ -100,6 +101,7 @@ typedef struct {
 typedef struct {
     V2f pos;
     f32 perp_wall_dist;
+    f32 eucledian_dist;
     b32 horizontal;
     u32 map_tile_value;
 } Intersect;

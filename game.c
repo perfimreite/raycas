@@ -144,6 +144,7 @@ internal char *get_file_name_from_path(const char *path)
             j = 0;
             continue;
         } else if (path[i] == '.') {
+            // TODO: Handle case where a directory has '.'
             break;
         }
         file_name[j++] = path[i];
@@ -314,10 +315,9 @@ internal void overlay_next_state(void)
 
 void player_init(void)
 {
-    player.pos.x = 200;
-    player.pos.y = 200;
-    player.dir.x = 1;
-    player.dir.y = 0;
+    player.pos = v2f(200.0f, 200.0f);
+    player.dir = v2f(1.0f, 0.0f);
+    player.camera_plane = v2f(0.0f, -1.0f);
     player.vel = 200;
     player.rotation_vel = 200;
     player.fov = M_PI_2;
@@ -347,12 +347,14 @@ void player_move_backward(f64 dt)
 
 void player_rotate_clockwise(f64 dt)
 {
-    player.dir = v2f_rotate(player.dir, radians_from_degrees(player.rotation_vel) * dt);
+    player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
+    player.camera_plane = v2f_rotate(player.camera_plane, radians_from_degrees(-player.rotation_vel) * dt);
 }
 
 void player_rotate_counterclockwise(f64 dt)
 {
-    player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
+    player.dir = v2f_rotate(player.dir, radians_from_degrees(player.rotation_vel) * dt);
+    player.camera_plane = v2f_rotate(player.camera_plane, radians_from_degrees(player.rotation_vel) * dt);
 }
 
 internal Texture get_texture_from_mtv(u32 mtv)
@@ -397,44 +399,43 @@ internal Intersect get_intersect(V2f pos, V2f dir)
     V2f step       = v2f(0, 0);
     V2f side_dist  = v2f(0, 0);
 
-    delta_dist.x = dir.x == 0 ? FLT_MAX : fabs(1.0f / dir.x);
-    delta_dist.y = dir.y == 0 ? FLT_MAX : fabs(1.0f / dir.y);
+    delta_dist.x = dir.x == 0 ? FLT_MAX : fabs(CELL_SIZE / dir.x);
+    delta_dist.y = dir.y == 0 ? FLT_MAX : fabs(CELL_SIZE / dir.y);
 
-    V2f tile_relative_pos = v2f_scale(pos, 1.0f / CELL_SIZE);
-    V2f map_tile = v2f_floor(tile_relative_pos);
+    V2f map_tile = v2f_scale(v2f_floor(v2f_scale(pos, 1.0f / CELL_SIZE)), CELL_SIZE);
 
     if (dir.x < 0) {
         step.x = -1;
-        side_dist.x = (tile_relative_pos.x - map_tile.x);
+        side_dist.x = (pos.x - map_tile.x);
     } else {
         step.x = 1;
-        side_dist.x = (map_tile.x + 1.0f - tile_relative_pos.x);
+        side_dist.x = (map_tile.x + CELL_SIZE - pos.x);
     }
     if (dir.y < 0) {
         step.y = -1;
-        side_dist.y = (tile_relative_pos.y - map_tile.y);
+        side_dist.y = (pos.y - map_tile.y);
     } else {
         step.y = 1;
-        side_dist.y = (map_tile.y + 1.0f - tile_relative_pos.y);
+        side_dist.y = (map_tile.y + CELL_SIZE - pos.y);
     }
-    side_dist = v2f_mul(side_dist, delta_dist);
+
+    side_dist = v2f_mul(side_dist, v2f_scale(delta_dist, 1.0f / CELL_SIZE));
 
     Intersect intersect = {0};
 
     for (;;) {
         if (side_dist.x < side_dist.y) {
             side_dist.x += delta_dist.x;
-            map_tile.x += step.x;
+            map_tile.x += step.x * CELL_SIZE;
             intersect.horizontal = false;
         } else {
             side_dist.y += delta_dist.y;
-            map_tile.y += step.y;
+            map_tile.y += step.y * CELL_SIZE;
             intersect.horizontal = true;
         }
 
-        V2f map_pos = v2f_scale(map_tile, CELL_SIZE);
-        if (is_wall(map_pos.x, map_pos.y)) {
-            intersect.map_tile_value = get_map_tile(map_pos.x, map_pos.y);
+        if (is_wall(map_tile.x, map_tile.y)) {
+            intersect.map_tile_value = get_map_tile(map_tile.x, map_tile.y);
             break;
         }
     }
@@ -442,7 +443,7 @@ internal Intersect get_intersect(V2f pos, V2f dir)
     intersect.perp_wall_dist = (intersect.horizontal ?
                                 side_dist.y - delta_dist.y :
                                 side_dist.x - delta_dist.x);
-    intersect.pos = v2f_add(pos, v2f_scale(dir, intersect.perp_wall_dist * CELL_SIZE));
+    intersect.pos = v2f_add(pos, v2f_scale(dir, intersect.perp_wall_dist));
     return intersect;
 }
 
@@ -459,12 +460,14 @@ internal void draw_crosshair(Color color)
 
 internal void draw_3d_view(Player player)
 {
-    f32 angle_curr  = -player.fov / 2.0f;
-    f32 angle_step  =  player.fov / (game.width - 1);
+    // f32 angle_curr  = -player.fov / 2.0f;
+    // f32 angle_step  =  player.fov / (game.width - 1);
     for (u32 x = 0; x < game.width; x++) {
-        V2f curr_dir = v2f_rotate(player.dir, angle_curr);
+        f32 camera_x = 2.0f * x / (f32)game.width - 1.0f;
+        V2f curr_dir = v2f_add(player.dir, v2f_scale(player.camera_plane, camera_x));
+        // V2f curr_dir = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = get_intersect(player.pos, curr_dir);
-        f32 wall_height = game.height / intersect.perp_wall_dist;
+        f32 wall_height = game.height * CELL_SIZE  / intersect.perp_wall_dist;
 
         f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
         V2f window_start = v2f(x, 0);
@@ -480,8 +483,8 @@ internal void draw_3d_view(Player player)
             Texture texture = get_texture_from_mtv(intersect.map_tile_value);
 
             f32 wall_x = intersect.horizontal ?
-                player.pos.x + intersect.perp_wall_dist * curr_dir.x :
-                player.pos.y + intersect.perp_wall_dist * curr_dir.y;
+                player.pos.x / CELL_SIZE + intersect.perp_wall_dist / CELL_SIZE * curr_dir.x :
+                player.pos.y / CELL_SIZE + intersect.perp_wall_dist / CELL_SIZE * curr_dir.y;
             wall_x -= floor(wall_x);
             V2f texture_index = v2f(0, 0);
 
@@ -515,7 +518,7 @@ internal void draw_3d_view(Player player)
             }
         }
 
-        angle_curr += angle_step;
+        // angle_curr += angle_step;
     }
 
     if (game.show_crosshair) {
@@ -534,8 +537,11 @@ internal void draw_player_fov(Color color, Player player, u32 beam_spread)
     f32 angle_end   =  player.fov / 2.0f;
     f32 angle_step  =  player.fov / (game.width - 1) * beam_spread;
     for (; angle_curr <= angle_end; angle_curr += angle_step) {
+        // f32 camera_x = 2.0f * x / (f32)game.width - 1.0f;
+        // V2f curr_dir = v2f_add(player.dir, v2f_scale(player.camera_plane, camera_x));
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = get_intersect(player.pos, curr_dir);
+        // platform_draw_circle(red, intersect.pos, 4, true);
         platform_draw_line(color, player.pos, intersect.pos);
     }
 }
