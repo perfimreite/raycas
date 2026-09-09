@@ -7,12 +7,12 @@
 #define BASE_H
 
 /* === Assert === */
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
-#define ASSERT(x) assert(x)
+    #define ASSERT(x) assert(x)
 #else
-#define Assert(x)
+    #define ASSERT(x) ((void)(x))
 #endif // DEBUG
 
 /* === types === */

@@ -321,6 +321,9 @@ i32 main(void)
 
         platform_update_mouse_state(&game.mouse_state);
 
+        // update
+        game_update(frame_time.dt);
+
         // rendering
         game_render(frame_time.dt);
 

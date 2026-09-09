@@ -1,8 +1,36 @@
-#include "constants.h"
 #include "vector.h"
 
 #ifndef GAME_H
 #define GAME_H
+
+#ifdef HIGH_RESOLUTION
+    #define WINDOW_WIDTH 1600
+    #define WINDOW_HEIGHT 1200
+#else
+    #define WINDOW_WIDTH 960
+    #define WINDOW_HEIGHT 720
+#endif
+
+#define OVERLAY_TEXT_SIZE 128
+
+#define DEFAULT_TEXTURE_WIDTH 64
+#define DEFAULT_TEXTURE_HEIGHT 64
+static_assert(DEFAULT_TEXTURE_WIDTH == DEFAULT_TEXTURE_HEIGHT, "Should be equal");
+
+#define WINDOW_CENTER_X (((WINDOW_WIDTH)  - 1.0f) / 2.0f)
+#define WINDOW_CENTER_Y (((WINDOW_HEIGHT) - 1.0f) / 2.0f)
+
+#define COLS 16
+#define ROWS 12
+static_assert(WINDOW_WIDTH / COLS == WINDOW_HEIGHT / ROWS, "Should be equal");
+#define CELL_SIZE ((f32)(WINDOW_WIDTH) / (COLS))
+
+#define MAP_COUNT 2
+
+#define FONT_FILE "fonts/CascadiaMono.ttf"
+
+#define TEXTURES_PATH "assets/wolfenstein_textures/"
+#define FIRST_TEXTURE_ID 2
 
 typedef struct {
     u32 x;
@@ -188,20 +216,22 @@ void overlay_init(void);
 
 void player_init(void);
 
-void game_init  (void);
+void game_init(void);
+void game_update(f64 dt);
 void game_render(f64 dt);
 
-void platform_clear_backbuffer   (Color color);
-void platform_draw_point         (Color color, V2f a);
-void platform_draw_line          (Color color, V2f a, V2f b);
-void platform_draw_rect          (Color color, Rect rect);
-void platform_draw_rect_rounded  (Color color, Rect rect, i32 radius);
-void platform_draw_circle        (Color color, V2f a, i32 radius, b32 filled);
-V2f  platform_get_text_dims      (i32 ptsize, const char *text);
+void platform_clear_backbuffer(Color color);
+void platform_draw_point(Color color, V2f a);
+void platform_draw_line(Color color, V2f a, V2f b);
+void platform_draw_rect(Color color, Rect rect);
+void platform_draw_rect_rounded(Color color, Rect rect, i32 radius);
+void platform_draw_circle(Color color, V2f a, i32 radius, b32 filled);
+V2f  platform_get_text_dims(i32 ptsize, const char *text);
 Rect platform_center_text_in_rect(Rect rect, i32 ptsize, const char *text);
-void platform_draw_text          (Color fg, Color bg, Rect rect, const char *text, i32 ptsize);
-b32  platform_point_in_rect      (V2f point, Rect rect);
-void platform_get_mouse_state    (Mouse_State *mouse_state);
-void platform_set_cursor         (Cursor_Kind cursor);
+void platform_draw_text(Color fg, Color bg, Rect rect, const char *text, i32 ptsize);
+b32  platform_point_in_rect(V2f point, Rect rect);
+void platform_get_mouse_state(Mouse_State *mouse_state);
+void platform_set_cursor(Cursor_Kind cursor);
 
 #endif // GAME_H
+

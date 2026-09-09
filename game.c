@@ -13,6 +13,7 @@
 #include "thirdparty/stb_image.h"
 
 #include <stdio.h>
+#include <float.h>
 
 global const Color black             = { .r = 0  , .g = 0  , .b = 0  , .a = 255 };
 global const Color white             = { .r = 255, .g = 255, .b = 255, .a = 255 };
@@ -354,6 +355,13 @@ void player_rotate_counterclockwise(f64 dt)
     player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
 }
 
+internal Texture get_texture_from_mtv(u32 mtv)
+{
+    u32 index = mtv - FIRST_TEXTURE_ID;
+    Texture texture = LIST_GET(game.textures, index);
+    return texture;
+}
+
 internal void draw_walls()
 {
     for (u32 y = 0; y < game.height; y += CELL_SIZE) {
@@ -364,8 +372,7 @@ internal void draw_walls()
                 if (map_tile_value == 1) {
                     platform_draw_rect(light_gray, rect);
                 } else {
-                    u32 index = map_tile_value - FIRST_TEXTURE_ID;
-                    Texture texture = LIST_GET(game.textures, index);
+                    Texture texture = get_texture_from_mtv(map_tile_value);
                     platform_draw_rect(texture.tile_color, rect);
                 }
             }
@@ -384,33 +391,33 @@ internal void draw_grid(Color color)
     }
 }
 
-internal Intersect get_intersect(V2f pos, V2f ray_dir)
+internal Intersect get_intersect(V2f pos, V2f dir)
 {
     V2f delta_dist = v2f(0, 0);
     V2f step       = v2f(0, 0);
     V2f side_dist  = v2f(0, 0);
 
-    delta_dist.x = ray_dir.x == 0 ? 1e30 : fabs(1.0f / ray_dir.x);
-    delta_dist.y = ray_dir.y == 0 ? 1e30 : fabs(1.0f / ray_dir.y);
+    delta_dist.x = dir.x == 0 ? FLT_MAX : fabs(1.0f / dir.x);
+    delta_dist.y = dir.y == 0 ? FLT_MAX : fabs(1.0f / dir.y);
 
     V2f tile_relative_pos = v2f_scale(pos, 1.0f / CELL_SIZE);
     V2f map_tile = v2f_floor(tile_relative_pos);
 
-    if (ray_dir.x < 0) {
+    if (dir.x < 0) {
         step.x = -1;
-        side_dist.x = (tile_relative_pos.x - map_tile.x) * delta_dist.x;
+        side_dist.x = (tile_relative_pos.x - map_tile.x);
     } else {
         step.x = 1;
-        side_dist.x = (map_tile.x + 1.0f - tile_relative_pos.x) * delta_dist.x;
+        side_dist.x = (map_tile.x + 1.0f - tile_relative_pos.x);
     }
-
-    if (ray_dir.y < 0) {
+    if (dir.y < 0) {
         step.y = -1;
-        side_dist.y = (tile_relative_pos.y - map_tile.y) * delta_dist.y;
+        side_dist.y = (tile_relative_pos.y - map_tile.y);
     } else {
         step.y = 1;
-        side_dist.y = (map_tile.y + 1.0f - tile_relative_pos.y) * delta_dist.y;
+        side_dist.y = (map_tile.y + 1.0f - tile_relative_pos.y);
     }
+    side_dist = v2f_mul(side_dist, delta_dist);
 
     Intersect intersect = {0};
 
@@ -432,11 +439,10 @@ internal Intersect get_intersect(V2f pos, V2f ray_dir)
         }
     }
 
-
     intersect.perp_wall_dist = (intersect.horizontal ?
                                 side_dist.y - delta_dist.y :
                                 side_dist.x - delta_dist.x);
-    intersect.pos = v2f_add(pos, v2f_scale(ray_dir, intersect.perp_wall_dist * CELL_SIZE));
+    intersect.pos = v2f_add(pos, v2f_scale(dir, intersect.perp_wall_dist * CELL_SIZE));
     return intersect;
 }
 
@@ -451,19 +457,11 @@ internal void draw_crosshair(Color color)
                        v2f(WINDOW_CENTER_X + l, WINDOW_CENTER_Y));
 }
 
-internal inline Texture get_texture_from_mtv(u32 mtv)
-{
-    u32 index = mtv - FIRST_TEXTURE_ID;
-    Texture texture = LIST_GET(game.textures, index);
-    return texture;
-}
-
 internal void draw_3d_view(Player player)
 {
     f32 angle_curr  = -player.fov / 2.0f;
-    f32 angle_end   =  player.fov / 2.0f;
     f32 angle_step  =  player.fov / (game.width - 1);
-    for (u32 x = 0; angle_curr <= angle_end; angle_curr += angle_step, x++) {
+    for (u32 x = 0; x < game.width; x++) {
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = get_intersect(player.pos, curr_dir);
         f32 wall_height = game.height / intersect.perp_wall_dist;
@@ -516,6 +514,8 @@ internal void draw_3d_view(Player player)
                 }
             }
         }
+
+        angle_curr += angle_step;
     }
 
     if (game.show_crosshair) {
@@ -533,10 +533,9 @@ internal void draw_player_fov(Color color, Player player, u32 beam_spread)
     f32 angle_curr  = -player.fov / 2.0f;
     f32 angle_end   =  player.fov / 2.0f;
     f32 angle_step  =  player.fov / (game.width - 1) * beam_spread;
-    for (u32 buffer_x; angle_curr <= angle_end; angle_curr += angle_step, buffer_x++) {
+    for (; angle_curr <= angle_end; angle_curr += angle_step) {
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = get_intersect(player.pos, curr_dir);
-
         platform_draw_line(color, player.pos, intersect.pos);
     }
 }
@@ -698,7 +697,7 @@ internal void game_view_toggle_menu(void)
     }
 }
 
-internal void game_toggle_crosshair(void)
+internal inline void game_toggle_crosshair(void)
 {
     game.show_crosshair = !game.show_crosshair;
 }
@@ -769,11 +768,14 @@ internal void game_handle_pressed_keys(f64 dt)
     }
 }
 
-void game_render(f64 dt)
+void game_update(f64 dt)
 {
     game_process_mouse();
     game_handle_pressed_keys(dt);
+}
 
+void game_render(f64 dt)
+{
     switch (game.view) {
         default: {} break;
 
@@ -800,7 +802,7 @@ void game_render(f64 dt)
        case OVERLAY_STATE_HIDDEN: {} break;
 
        case OVERLAY_STATE_SHOWN: {
-           u32 fps = (u32)(1.0f / dt);
+           u32 fps = (u32)(1.0 / dt);
            overlay_update_message(&overlay, fps, player.pos);
            draw_overlay(overlay);
            // NOTE: can change to wrapped font rendering if msg gets too long

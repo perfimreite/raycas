@@ -1,4 +1,3 @@
-#include "constants.h"
 #include "vector.h"
 
 #if defined(_WIN32)
@@ -33,6 +32,17 @@ V2f v2f_sub(V2f a, V2f b)
     return (V2f){ .x = a.x - b.x, .y = a.y - b.y };
 }
 
+V2f v2f_mul(V2f a, V2f b)
+{
+    return (V2f){ .x = a.x * b.x, .y = a.y * b.y };
+}
+
+V2f v2f_div(V2f a, V2f b)
+{
+    ASSERT(b.x != 0.0f && b.y != 0.0f);
+    return (V2f){ .x = a.x / b.x, .y = a.y / b.y };
+}
+
 V2f v2f_unit(V2f a)
 {
     if (v2f_zero(a)) {
@@ -41,11 +51,6 @@ V2f v2f_unit(V2f a)
 
     f32 l = v2f_len(a);
     return v2f_scale(a, 1.0f / l);
-}
-
-V2f v2f_cell(V2f a)
-{
-    return v2f_scale(v2f_unit(a), CELL_SIZE);
 }
 
 V2f v2f_normal(V2f a)
