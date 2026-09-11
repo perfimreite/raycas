@@ -88,11 +88,11 @@ typedef struct {
 typedef struct {
     V2f pos;
     V2f dir;
-    V2f camera_plane;
 
     i32 vel;
     i32 rotation_vel;
     f32 fov;
+    f32 angle_step;
     u32 radius;
 
     Color color;

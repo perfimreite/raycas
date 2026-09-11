@@ -248,9 +248,9 @@ i32 main(void)
     SDL_Event event = {0};
     const u8 *keystate = NULL;
 
+    game_init();
     overlay_init();
     player_init();
-    game_init();
 
     Frame_Time frame_time = {0};
 

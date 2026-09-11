@@ -213,11 +213,14 @@ internal Texture load_texture_from_file(const char *file_path)
                     ((texture.data[i] & 0x00FF0000) >> 16) |
                     ((texture.data[i] & 0x000000FF) << 16);
             }
+        } else {
+            fprintf(stderr, "ERROR: Failed to read texture file: `%s`\n", file_path);
+            texture = get_fallback_texture();
         }
 
         fclose(file);
     } else {
-        fprintf(stderr, "ERROR: Failed to load texture: `%s`\n", file_path);
+        fprintf(stderr, "ERROR: Failed to open texture file: `%s`\n", file_path);
         texture = get_fallback_texture();
     }
     texture.data = rotate_matrix(texture.data, texture.width, texture.height);
@@ -295,15 +298,15 @@ internal Menu create_menu(void)
 void overlay_init(void)
 {
     overlay.state = OVERLAY_STATE_HIDDEN;
-    overlay.text_format = "RESOLUTION:%dx%d FPS:%d POS:(%.1f, %.1f)";
+    overlay.text_format = "RESOLUTION:%dx%d FPS:%d AVERAGE_FPS:%.1lf POS:(%.1f, %.1f)";
     overlay.ptsize = 16;
 }
 
-internal inline void overlay_update_message(Overlay *overlay, u32 fps, V2f player_pos)
+internal inline void overlay_update_message(Overlay *overlay, u32 fps, f64 frame_average, V2f player_pos)
 {
     i32 bytes_written = sprintf(overlay->text, overlay->text_format,
                                 game.width, game.height,
-                                fps, player_pos.x, player_pos.y);
+                                fps, frame_average, player_pos.x, player_pos.y);
 
     ASSERT(bytes_written < OVERLAY_TEXT_SIZE);
 }
@@ -317,10 +320,10 @@ void player_init(void)
 {
     player.pos = v2f(200.0f, 200.0f);
     player.dir = v2f(1.0f, 0.0f);
-    player.camera_plane = v2f(0.0f, -1.0f);
     player.vel = 200;
     player.rotation_vel = 200;
     player.fov = M_PI_2;
+    player.angle_step = player.fov / (game.width - 1); 
     player.radius = 6;
     player.color = blue;
 }
@@ -347,21 +350,18 @@ void player_move_backward(f64 dt)
 
 void player_rotate_clockwise(f64 dt)
 {
-    player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
-    player.camera_plane = v2f_rotate(player.camera_plane, radians_from_degrees(-player.rotation_vel) * dt);
+    player.dir = v2f_rotate(player.dir, radians_from_degrees(player.rotation_vel) * dt);
 }
 
 void player_rotate_counterclockwise(f64 dt)
 {
-    player.dir = v2f_rotate(player.dir, radians_from_degrees(player.rotation_vel) * dt);
-    player.camera_plane = v2f_rotate(player.camera_plane, radians_from_degrees(player.rotation_vel) * dt);
+    player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
 }
 
-internal Texture get_texture_from_mtv(u32 mtv)
+internal inline Texture *get_texture_from_mtv(u32 mtv)
 {
     u32 index = mtv - FIRST_TEXTURE_ID;
-    Texture texture = LIST_GET(game.textures, index);
-    return texture;
+    return &LIST_GET(game.textures, index);
 }
 
 internal void draw_walls()
@@ -374,8 +374,8 @@ internal void draw_walls()
                 if (map_tile_value == 1) {
                     platform_draw_rect(light_gray, rect);
                 } else {
-                    Texture texture = get_texture_from_mtv(map_tile_value);
-                    platform_draw_rect(texture.tile_color, rect);
+                    Texture *texture = get_texture_from_mtv(map_tile_value);
+                    platform_draw_rect(texture->tile_color, rect);
                 }
             }
         }
@@ -460,15 +460,13 @@ internal void draw_crosshair(Color color)
 
 internal void draw_3d_view(Player player)
 {
-    // f32 angle_curr  = -player.fov / 2.0f;
-    // f32 angle_step  =  player.fov / (game.width - 1);
+    f32 angle_curr  = -player.fov / 2.0f;
     for (u32 x = 0; x < game.width; x++) {
-        f32 camera_x = 2.0f * x / (f32)game.width - 1.0f;
-        V2f curr_dir = v2f_add(player.dir, v2f_scale(player.camera_plane, camera_x));
-        // V2f curr_dir = v2f_rotate(player.dir, angle_curr);
-        Intersect intersect = get_intersect(player.pos, curr_dir);
-        f32 wall_height = game.height * CELL_SIZE  / intersect.perp_wall_dist;
+        V2f ray = v2f_rotate(player.dir, angle_curr);
+        Intersect intersect = get_intersect(player.pos, ray);
+        f32 rel_perp_wall_dist = intersect.perp_wall_dist / CELL_SIZE;
 
+        f32 wall_height = game.height / rel_perp_wall_dist;
         f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
         V2f window_start = v2f(x, 0);
         V2f wall_start = v2f(x, wall_top);
@@ -480,37 +478,36 @@ internal void draw_3d_view(Player player)
             Color wall_color = intersect.horizontal ? light_gray : gray;
             platform_draw_line(wall_color, wall_start, wall_end);
         } else {
-            Texture texture = get_texture_from_mtv(intersect.map_tile_value);
+            Texture *texture = get_texture_from_mtv(intersect.map_tile_value);
 
             f32 wall_x = intersect.horizontal ?
-                player.pos.x / CELL_SIZE + intersect.perp_wall_dist / CELL_SIZE * curr_dir.x :
-                player.pos.y / CELL_SIZE + intersect.perp_wall_dist / CELL_SIZE * curr_dir.y;
+                player.pos.x / CELL_SIZE + rel_perp_wall_dist * ray.x :
+                player.pos.y / CELL_SIZE + rel_perp_wall_dist * ray.y;
             wall_x -= floor(wall_x);
             V2f texture_index = v2f(0, 0);
 
-            texture_index.x = texture.width - 1 - (i32)(wall_x * texture.width);
-            if ((!intersect.horizontal && curr_dir.x > 0) || (intersect.horizontal && curr_dir.y < 0)) {
-                texture_index.x = texture.width - texture_index.x - 1;
+            texture_index.x = texture->width - 1 - (i32)(wall_x * texture->width);
+            if ((!intersect.horizontal && ray.x > 0) || (intersect.horizontal && ray.y < 0)) {
+                texture_index.x = texture->width - texture_index.x - 1;
             }
 
-            f32 step = texture.height / wall_height;
+            f32 step = texture->height / wall_height;
             f32 texture_pos = (wall_top - game.height / 2.0 + wall_height / 2.0) * step;
 
             if (intersect.horizontal) {
                 for (u32 y = wall_top; y < wall_height + wall_top; y++, texture_pos += step) {
-                    texture_index.y = (i32)texture_pos & (texture.height - 1);
+                    texture_index.y = (i32)texture_pos & (texture->height - 1);
 
-                    u32 pixel = texture.data[(i32)(texture.height * texture_index.x + texture_index.y)];
+                    u32 pixel = texture->data[(i32)(texture->height * texture_index.x + texture_index.y)];
                     pixel = (pixel >> 1) & 8355711;
-                    Color color = color_from_u32(pixel);
 
-                    platform_draw_point(color, v2f(x, y));
+                    platform_draw_point(color_from_u32(pixel), v2f(x, y));
                 }
             } else {
                 for (u32 y = wall_top; y < wall_height + wall_top; y++, texture_pos += step) {
-                    texture_index.y = (i32)texture_pos & (texture.height - 1);
+                    texture_index.y = (i32)texture_pos & (texture->height - 1);
 
-                    u32 pixel = texture.data[(i32)(texture.height * texture_index.x + texture_index.y)];
+                    u32 pixel = texture->data[(i32)(texture->height * texture_index.x + texture_index.y)];
                     Color color = color_from_u32(pixel);
 
                     platform_draw_point(color, v2f(x, y));
@@ -518,7 +515,7 @@ internal void draw_3d_view(Player player)
             }
         }
 
-        // angle_curr += angle_step;
+        angle_curr += player.angle_step;
     }
 
     if (game.show_crosshair) {
@@ -537,11 +534,8 @@ internal void draw_player_fov(Color color, Player player, u32 beam_spread)
     f32 angle_end   =  player.fov / 2.0f;
     f32 angle_step  =  player.fov / (game.width - 1) * beam_spread;
     for (; angle_curr <= angle_end; angle_curr += angle_step) {
-        // f32 camera_x = 2.0f * x / (f32)game.width - 1.0f;
-        // V2f curr_dir = v2f_add(player.dir, v2f_scale(player.camera_plane, camera_x));
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = get_intersect(player.pos, curr_dir);
-        // platform_draw_circle(red, intersect.pos, 4, true);
         platform_draw_line(color, player.pos, intersect.pos);
     }
 }
@@ -569,8 +563,8 @@ internal void draw_minimap_walls(f32 scale)
                 if (map_tile_value == 1) {
                     platform_draw_rect(light_gray, rect);
                 } else {
-                    Texture texture = get_texture_from_mtv(map_tile_value);
-                    platform_draw_rect(texture.tile_color, rect);
+                    Texture *texture = get_texture_from_mtv(map_tile_value);
+                    platform_draw_rect(texture->tile_color, rect);
                 }
             }
         }
@@ -669,6 +663,7 @@ void game_init(void)
     game.quit = false;
 
     game.textures = (Textures){0};
+
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"redbrick.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"bluestone.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"colorstone.png"));
@@ -677,6 +672,8 @@ void game_init(void)
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"mossy.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"purplestone.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"wood.png"));
+
+    // LIST_PUSH(game.textures, load_texture_from_file("assets/wall.png"));
     // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"greenlight.png"));
     // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"barrel.png"));
     // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"pillar.png"));
@@ -802,17 +799,34 @@ void game_render(f64 dt)
         } break;
     }
 
+    local_persist f64 elapsed_time = 0.0;
+    local_persist i32 secs = 1;
+    local_persist f64 frames = 0;
+    local_persist f64 frame_average = 0;
+
+    elapsed_time += dt;
+    frames += 1;
+
     switch (overlay.state) {
-       default: {} break;
+        default: {} break;
 
-       case OVERLAY_STATE_HIDDEN: {} break;
+        case OVERLAY_STATE_HIDDEN: {} break;
 
-       case OVERLAY_STATE_SHOWN: {
-           u32 fps = (u32)(1.0 / dt);
-           overlay_update_message(&overlay, fps, player.pos);
-           draw_overlay(overlay);
-           // NOTE: can change to wrapped font rendering if msg gets too long
-       } break;
+        case OVERLAY_STATE_SHOWN: {
+            if (elapsed_time >= secs) {
+                frame_average = frames / elapsed_time;
+#if 0
+                elapsed_time = 0.0;
+                frames = 0.0;
+#else 
+                secs++;
+#endif
+            }
+            u32 fps = (u32)(1.0 / dt);
+            overlay_update_message(&overlay, fps, frame_average, player.pos);
+            draw_overlay(overlay);
+            // NOTE: can change to wrapped font rendering if msg gets too long
+        } break;
     }
 }
 
