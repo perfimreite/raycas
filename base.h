@@ -7,8 +7,7 @@
 #define BASE_H
 
 /* === Assert === */
-// #define DEBUG
-
+#define DEBUG
 #ifdef DEBUG
     #define ASSERT(x) assert(x)
 #else

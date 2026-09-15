@@ -4,11 +4,11 @@
 #define GAME_H
 
 #ifdef HIGH_RESOLUTION
-    #define WINDOW_WIDTH 1600
-    #define WINDOW_HEIGHT 1200
-#else
     #define WINDOW_WIDTH 960
     #define WINDOW_HEIGHT 720
+#else
+    #define WINDOW_WIDTH 800
+    #define WINDOW_HEIGHT 600
 #endif
 
 #define OVERLAY_TEXT_SIZE 128
@@ -91,8 +91,11 @@ typedef struct {
 
     i32 vel;
     i32 rotation_vel;
+
     f32 fov;
     f32 angle_step;
+    Color fov_color;
+
     u32 radius;
 
     Color color;
@@ -101,7 +104,6 @@ typedef struct {
 typedef struct {
     V2f pos;
     f32 perp_wall_dist;
-    f32 eucledian_dist;
     b32 horizontal;
     u32 map_tile_value;
 } Intersect;
@@ -225,9 +227,11 @@ void game_render(f64 dt);
 void platform_clear_backbuffer(Color color);
 void platform_draw_point(Color color, V2f a);
 void platform_draw_line(Color color, V2f a, V2f b);
+void platform_draw_circle(Color color, V2f a, i32 radius);
+void platform_draw_circle_filled(Color color, V2f a, i32 radius);
 void platform_draw_rect(Color color, Rect rect);
 void platform_draw_rect_rounded(Color color, Rect rect, i32 radius);
-void platform_draw_circle(Color color, V2f a, i32 radius, b32 filled);
+void platform_draw_triangle(Color fg, Color bg, V2f a, V2f b, V2f c);
 V2f  platform_get_text_dims(i32 ptsize, const char *text);
 Rect platform_center_text_in_rect(Rect rect, i32 ptsize, const char *text);
 void platform_draw_text(Color fg, Color bg, Rect rect, const char *text, i32 ptsize);

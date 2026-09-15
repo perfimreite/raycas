@@ -101,16 +101,7 @@ void platform_draw_line(Color color, V2f a, V2f b)
     platform_val_err(SDL_RenderDrawLine(renderer, a.x, a.y, b.x, b.y));
 }
 
-void platform_draw_rect(Color color, Rect rect)
-{
-    SDL_Color sdl_color = translate_color(color);
-    platform_val_err(SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a));
-    SDL_Rect sdl_rect = translate_rect(rect);
-    platform_val_err(SDL_RenderFillRect(renderer, &sdl_rect));
-    platform_val_err(SDL_RenderDrawRect(renderer, &sdl_rect));
-}
-
-void platform_draw_circle(Color color, V2f center, i32 radius, b32 filled)
+void platform_draw_circle(Color color, V2f center, i32 radius)
 {
     // NOTE: Midpoint circle algorithm: https://www.youtube.com/watch?v=hpiILbMkF9w
     for (i32 x = 0, y = -radius, p = -radius; x < -y; x++) {
@@ -121,22 +112,42 @@ void platform_draw_circle(Color color, V2f center, i32 radius, b32 filled)
             p += 2 * x + 1;
         }
 
-        if (filled) {
-            platform_draw_line(color, v2f(center.x + x, center.y + y), v2f(center.x - x, center.y + y));
-            platform_draw_line(color, v2f(center.x + x, center.y - y), v2f(center.x - x, center.y - y));
-            platform_draw_line(color, v2f(center.x + y, center.y + x), v2f(center.x - y, center.y + x));
-            platform_draw_line(color, v2f(center.x + y, center.y - x), v2f(center.x - y, center.y - x));
-        }  else {
-            platform_draw_point(color, v2f(center.x + x, center.y + y));
-            platform_draw_point(color, v2f(center.x - x, center.y + y));
-            platform_draw_point(color, v2f(center.x + x, center.y - y));
-            platform_draw_point(color, v2f(center.x - x, center.y - y));
-            platform_draw_point(color, v2f(center.x + y, center.y + x));
-            platform_draw_point(color, v2f(center.x - y, center.y + x));
-            platform_draw_point(color, v2f(center.x + y, center.y - x));
-            platform_draw_point(color, v2f(center.x - y, center.y - x));
-        }
+        platform_draw_point(color, v2f(center.x + x, center.y + y));
+        platform_draw_point(color, v2f(center.x - x, center.y + y));
+        platform_draw_point(color, v2f(center.x + x, center.y - y));
+        platform_draw_point(color, v2f(center.x - x, center.y - y));
+        platform_draw_point(color, v2f(center.x + y, center.y + x));
+        platform_draw_point(color, v2f(center.x - y, center.y + x));
+        platform_draw_point(color, v2f(center.x + y, center.y - x));
+        platform_draw_point(color, v2f(center.x - y, center.y - x));
     }
+}
+
+void platform_draw_circle_filled(Color color, V2f center, i32 radius)
+{
+    // NOTE: Midpoint circle algorithm: https://www.youtube.com/watch?v=hpiILbMkF9w
+    for (i32 x = 0, y = -radius, p = -radius; x < -y; x++) {
+        if (p > 0) {
+            y += 1;
+            p += 2 * (x + y) + 1;
+        } else {
+            p += 2 * x + 1;
+        }
+
+        platform_draw_line(color, v2f(center.x + x, center.y + y), v2f(center.x - x, center.y + y));
+        platform_draw_line(color, v2f(center.x + x, center.y - y), v2f(center.x - x, center.y - y));
+        platform_draw_line(color, v2f(center.x + y, center.y + x), v2f(center.x - y, center.y + x));
+        platform_draw_line(color, v2f(center.x + y, center.y - x), v2f(center.x - y, center.y - x));
+    }
+}
+
+void platform_draw_rect(Color color, Rect rect)
+{
+    SDL_Color sdl_color = translate_color(color);
+    platform_val_err(SDL_SetRenderDrawColor(renderer, sdl_color.r, sdl_color.g, sdl_color.b, sdl_color.a));
+    SDL_Rect sdl_rect = translate_rect(rect);
+    platform_val_err(SDL_RenderFillRect(renderer, &sdl_rect));
+    platform_val_err(SDL_RenderDrawRect(renderer, &sdl_rect));
 }
 
 void platform_draw_rect_rounded(Color color, Rect rect, i32 radius)
@@ -153,10 +164,20 @@ void platform_draw_rect_rounded(Color color, Rect rect, i32 radius)
     platform_draw_rect(color, l_rect);
     platform_draw_rect(color, r_rect);
 
-    platform_draw_circle(color, v2f(i_rect.x, i_rect.y), radius, true);
-    platform_draw_circle(color, v2f(i_rect.x + i_rect.w - 1, i_rect.y), radius, true);
-    platform_draw_circle(color, v2f(i_rect.x, i_rect.y + i_rect.h - 1), radius, true);
-    platform_draw_circle(color, v2f(i_rect.x + i_rect.w - 1, i_rect.y + i_rect.h - 1), radius, true);
+    platform_draw_circle_filled(color, v2f(i_rect.x, i_rect.y), radius);
+    platform_draw_circle_filled(color, v2f(i_rect.x + i_rect.w - 1, i_rect.y), radius);
+    platform_draw_circle_filled(color, v2f(i_rect.x, i_rect.y + i_rect.h - 1), radius);
+    platform_draw_circle_filled(color, v2f(i_rect.x + i_rect.w - 1, i_rect.y + i_rect.h - 1), radius);
+}
+
+void platform_draw_triangle(Color fg, Color bg, V2f a, V2f b, V2f c)
+{
+    (void)fg;
+    (void)bg;
+    (void)a;
+    (void)b;
+    (void)c;
+    // TODO: Implement platform_draw_triangle
 }
 
 void platform_clear_backbuffer(Color color)
