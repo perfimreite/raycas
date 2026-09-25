@@ -79,7 +79,7 @@ internal u32 get_map_tile(f32 x, f32 y)
     return map[game.map_index][cy][cx];
 }
 
-internal b32 is_wall(f32 x, f32 y)
+internal inline b32 is_wall(f32 x, f32 y)
 {
     return get_map_tile(x, y) >= 1;
 }
@@ -312,7 +312,7 @@ internal void overlay_next_state(void)
 
 void player_init(void)
 {
-    player.pos = v2f(200.0f, 200.0f);
+    player.pos = v2f(4.0f * CELL_SIZE, 4.0f * CELL_SIZE);
     player.dir = v2f(1.0f, 0.0f);
     player.vel = 10000 / CELL_SIZE;
     player.rotation_vel = 200;
@@ -426,20 +426,23 @@ internal void draw_crosshair(Color color)
 
 internal void draw_3d_view(Player player)
 {
-    f32 angle_curr  = -player.fov / 2.0f;
+    // TODO: numbers that correspond to pixel coords should be intergers.
+    //       this will make calculations faster?
+
+    f32 angle_curr = -player.fov / 2.0f;
     for (u32 x = 0; x < game.width; x++) {
         V2f ray = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = get_intersect(player.pos, ray);
         f32 rel_perp_wall_dist = intersect.perp_wall_dist / CELL_SIZE;
 
         f32 wall_height = game.height / rel_perp_wall_dist;
-        f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
+        f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.height / 2.0f), 0, game.height - 1);
         V2f window_start = v2f(x, 0);
         V2f wall_start = v2f(x, wall_top);
         platform_draw_line(light_blue, window_start, wall_start);
 
         if (intersect.map_tile_value == 1) {
-            f32 wall_bottom = CLAMP((wall_height / 2.0f) + (game.height / 2.0f), 0.0f, game.height - 1.0f);
+            f32 wall_bottom = CLAMP((wall_height / 2.0f) + (game.height / 2.0f), 0, game.height - 1);
             V2f wall_end = v2f(x, wall_bottom);
             Color wall_color = intersect.horizontal ? light_gray : gray;
             platform_draw_line(wall_color, wall_start, wall_end);
@@ -453,32 +456,28 @@ internal void draw_3d_view(Player player)
             V2f texture_index = v2f(0, 0);
 
             texture_index.x = (i32)(wall_x * texture->width);
-            if ((!intersect.horizontal && ray.x > 0) || (intersect.horizontal && ray.y < 0)) {
+            if ((!intersect.horizontal && ray.x > 0.0f) || (intersect.horizontal && ray.y < 0.0f)) {
                 texture_index.x = texture->width - texture_index.x - 1;
             }
 
             f32 step = texture->height / wall_height;
-            f32 texture_pos = (wall_top - game.height / 2.0 + wall_height / 2.0) * step;
+            f32 texture_pos = (wall_top - game.height / 2.0f + wall_height / 2.0f) * step;
 
-            for (u32 y = wall_top; y < wall_height + wall_top; y++, texture_pos += step) {
+            for (u32 y = 0; y < wall_height; y++, texture_pos += step) {
                 texture_index.y = (i32)texture_pos & (texture->height - 1);
 
-                u32 pixel = texture->data[(i32)(texture->height * texture_index.x + texture_index.y)];
+                u32 pixel = texture->data[(i32)(texture->width * texture_index.x + texture_index.y)];
                 if (intersect.horizontal) {
                     // NOTE: `&` with binary number to set last
                     // bit of every byte to zero after the `>>`
                     pixel = (pixel >> 1) & 8355711; // 0b011111110111111101111111
                 }
 
-                platform_draw_point(color_from_u32(pixel), v2f(x, y));
+                platform_draw_point(color_from_u32(pixel), v2f(x, y + wall_top));
             }
         }
 
         angle_curr += player.angle_step;
-    }
-
-    if (game.show_crosshair) {
-        draw_crosshair(game.crosshair_color);
     }
 }
 
@@ -776,6 +775,10 @@ void game_render(f64 dt)
             platform_clear_backbuffer(green);
             draw_3d_view(player);
             draw_minimap();
+
+            if (game.show_crosshair) {
+                draw_crosshair(game.crosshair_color);
+            }
         } break;
 
         case VIEW_MAP: {
