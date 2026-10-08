@@ -7,8 +7,8 @@
     #define WINDOW_WIDTH 960
     #define WINDOW_HEIGHT 720
 #else
-    #define WINDOW_WIDTH 800
-    #define WINDOW_HEIGHT 600
+    #define WINDOW_WIDTH 960
+    #define WINDOW_HEIGHT 720
 #endif
 
 #define OVERLAY_TEXT_SIZE 128
@@ -195,8 +195,11 @@ typedef struct {
 typedef struct {
     b32 quit;
 
-    u32 width;
-    u32 height;
+    u32 window_width;
+    u32 window_height;
+
+    u32 map_width;
+    u32 map_height;
 
     Rect minimap_dims;
 
@@ -214,7 +217,7 @@ typedef struct {
     Menu menu;
 } Game;
 
-Rect make_rect(u32 x, u32 y, u32 w, u32 h);
+Rect rect_new(u32 x, u32 y, u32 w, u32 h);
 
 void overlay_init(void);
 

@@ -152,11 +152,11 @@ void platform_draw_rect(Color color, Rect rect)
 
 void platform_draw_rect_rounded(Color color, Rect rect, i32 radius)
 {
-    Rect i_rect = make_rect(rect.x + radius, rect.y + radius, rect.w - 2*radius, rect.h - 2*radius);
-    Rect t_rect = make_rect(rect.x + radius, rect.y, rect.w - 2*radius, radius);
-    Rect b_rect = make_rect(rect.x + radius, rect.y + rect.h - radius, rect.w - 2*radius, radius);
-    Rect l_rect = make_rect(rect.x, rect.y + radius, radius, rect.h - 2*radius);
-    Rect r_rect = make_rect(rect.x + rect.w - radius, rect.y + radius, radius, rect.h - 2*radius);
+    Rect i_rect = rect_new(rect.x + radius, rect.y + radius, rect.w - 2*radius, rect.h - 2*radius);
+    Rect t_rect = rect_new(rect.x + radius, rect.y, rect.w - 2*radius, radius);
+    Rect b_rect = rect_new(rect.x + radius, rect.y + rect.h - radius, rect.w - 2*radius, radius);
+    Rect l_rect = rect_new(rect.x, rect.y + radius, radius, rect.h - 2*radius);
+    Rect r_rect = rect_new(rect.x + rect.w - radius, rect.y + radius, radius, rect.h - 2*radius);
 
     platform_draw_rect(color, i_rect);
     platform_draw_rect(color, t_rect);

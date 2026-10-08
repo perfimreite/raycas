@@ -22,23 +22,31 @@ b32 v2f_zero(V2f a)
 
 V2f v2f_add(V2f a, V2f b)
 {
-    return v2f(a.x + b.x, a.y + b.y);
+    a.x += b.x;
+    a.y += b.y;
+    return a;
 }
 
 V2f v2f_sub(V2f a, V2f b)
 {
-    return v2f(a.x - b.x, a.y - b.y);
+    a.x -= b.x;
+    a.y -= b.y;
+    return a;
 }
 
 V2f v2f_mul(V2f a, V2f b)
 {
-    return v2f(a.x * b.x, a.y * b.y);
+    a.x *= b.x;
+    a.y *= b.y;
+    return a;
 }
 
 V2f v2f_div(V2f a, V2f b)
 {
     ASSERT(b.x != 0.0f && b.y != 0.0f);
-    return v2f(a.x / b.x, a.y / b.y);
+    a.x /= b.x;
+    a.y /= b.y;
+    return a;
 }
 
 V2f v2f_unit(V2f a)
@@ -47,8 +55,7 @@ V2f v2f_unit(V2f a)
         return a;
     }
 
-    f32 l = v2f_len(a);
-    return v2f_scale(a, 1.0f / l);
+    return v2f_scale(a, 1.0f / v2f_len(a));
 }
 
 V2f v2f_normal(V2f a)
@@ -58,7 +65,9 @@ V2f v2f_normal(V2f a)
 
 V2f v2f_scale(V2f a, f32 k)
 {
-    return v2f(a.x * k, a.y * k);
+    a.x *= k;
+    a.y *= k;
+    return a;
 }
 
 V2f v2f_rotate(V2f a, f32 angle)
@@ -71,6 +80,13 @@ V2f v2f_rotate(V2f a, f32 angle)
 V2f v2f_floor(V2f a)
 {
     return v2f(floor(a.x), floor(a.y));
+}
+
+V2f v2f_lerp(V2f a, V2f b, V2f t)
+{
+    a.x += (b.x - a.x) * t.x;
+    a.y += (b.y - a.y) * t.y;
+    return a;
 }
 
 V2f v2f_from_v2i(V2i a)
@@ -112,23 +128,31 @@ b32 v2i_zero(V2i a)
 
 V2i v2i_add(V2i a, V2i b)
 {
-    return v2i(a.x + b.x, a.y + b.y);
+    a.x += b.x;
+    a.y += b.y;
+    return a;
 }
 
 V2i v2i_sub(V2i a, V2i b)
 {
-    return v2i(a.x - b.x, a.y - b.y);
+    a.x -= b.x;
+    a.y -= b.y;
+    return a;
 }
 
 V2i v2i_mul(V2i a, V2i b)
 {
-    return v2i(a.x * b.x, a.y * b.y);
+    a.x *= b.x;
+    a.y *= b.y;
+    return a;
 }
 
 V2i v2i_div(V2i a, V2i b)
 {
     ASSERT(b.x != 0 && b.y != 0);
-    return v2i(a.x / b.x, a.y / b.y);
+    a.x /= b.x;
+    a.y /= b.y;
+    return a;
 }
 
 V2i v2i_unit(V2i a)
@@ -137,8 +161,7 @@ V2i v2i_unit(V2i a)
         return a;
     }
 
-    i32 l = v2i_len(a);
-    return v2i_scale(a, 1 / l);
+    return v2i_scale(a, 1 / v2i_len(a));
 }
 
 V2i v2i_normal(V2i a)
@@ -148,7 +171,9 @@ V2i v2i_normal(V2i a)
 
 V2i v2i_scale(V2i a, i32 k)
 {
-    return v2i(a.x * k, a.y * k);
+    a.x *= k;
+    a.y *= k;
+    return a;
 }
 
 V2i v2i_rotate(V2i a, i32 angle)
@@ -162,6 +187,13 @@ V2i v2i_rotate(V2i a, i32 angle)
 V2i v2i_floor(V2i a)
 {
     return v2i(floor(a.x), floor(a.y));
+}
+
+V2i v2i_lerp(V2i a, V2i b, V2i t)
+{
+    a.x += (b.x - a.x) * t.x;
+    a.y += (b.y - a.y) * t.y;
+    return a;
 }
 
 V2i v2i_from_v2f(V2f a)

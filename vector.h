@@ -27,6 +27,7 @@ V2f v2f_normal(V2f a);
 V2f v2f_scale(V2f a, f32 k);
 V2f v2f_rotate(V2f a, f32 angle);
 V2f v2f_floor(V2f a);
+V2f v2f_lerp(V2f a, V2f b, V2f t);
 V2f v2f_from_v2i(V2i a);
 
 f32 v2f_square_len(V2f a);
@@ -49,6 +50,7 @@ V2i v2i_normal(V2i a);
 V2i v2i_scale(V2i a, i32 k);
 V2i v2i_rotate(V2i a, i32 angle);
 V2i v2i_floor(V2i a);
+V2i v2i_lerp(V2i a, V2i b, V2i t);
 V2i v2i_from_v2f(V2f a);
 
 i32 v2i_square_len(V2i a);

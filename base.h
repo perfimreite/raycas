@@ -79,7 +79,7 @@ typedef int32_t  b32;
     (list).items[0]
 
 #define LIST_GET(list, idx) \
-    (list).items[(ASSERT(idx < (list).count), (idx))]
+    (list).items[(ASSERT((idx) < (list).count), (idx))]
 
 #define LIST_FOR_EACH(T, list, el) \
     for (T *(el) = (list).items; (el) < &(list).items[(list).count]; (el)++)

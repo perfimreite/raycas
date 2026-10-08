@@ -72,11 +72,9 @@ internal void next_map_index(void)
 
 internal u32 get_map_tile(f32 x, f32 y)
 {
-    i32 cy = y / CELL_SIZE;
-    i32 cx = x / CELL_SIZE;
-    ASSERT(cy >= 0);
-    ASSERT(cx >= 0);
-    return map[game.map_index][cy][cx];
+    ASSERT(x >= 0);
+    ASSERT(y >= 0);
+    return map[game.map_index][(i32)y][(i32)x];
 }
 
 internal inline b32 is_wall(f32 x, f32 y)
@@ -224,7 +222,7 @@ internal Texture load_texture_from_file(const char *file_path)
     return texture;
 }
 
-Rect make_rect(u32 x, u32 y, u32 w, u32 h)
+Rect rect_new(u32 x, u32 y, u32 w, u32 h)
 {
     return (Rect) {
         .x = x,
@@ -236,10 +234,10 @@ Rect make_rect(u32 x, u32 y, u32 w, u32 h)
 
 internal Rect rect_shrink(Rect rect, i32 k)
 {
-    return make_rect(rect.x + k, rect.y + k, rect.w - 2 * k, rect.h - 2 * k);
+    return rect_new(rect.x + k, rect.y + k, rect.w - 2 * k, rect.h - 2 * k);
 }
 
-internal Box make_box(const char *text, i32 ptsize, Rect rect,
+internal Box box_new(const char *text, i32 ptsize, Rect rect,
                       Box_Style_Flag box_style_flag, Color fg, Color bg,
                       Color border_color, i32 border_radius, i32 border_thickness)
 {
@@ -256,28 +254,28 @@ internal Box make_box(const char *text, i32 ptsize, Rect rect,
     };
 }
 
-internal Button make_button(const char *text, i32 ptsize, Rect rect,
+internal Button button_new(const char *text, i32 ptsize, Rect rect,
                             Box_Style_Flag box_style_flag, Color fg, Color bg,
                             Color border_color, i32 border_radius, i32 border_thickness)
 {
     return (Button) {
         .pressed = false,
-        .box = make_box(text, ptsize, rect, box_style_flag,
+        .box = box_new(text, ptsize, rect, box_style_flag,
                         fg, bg, border_color, border_radius, border_thickness)
     };
 }
 
-internal Menu create_menu(void)
+internal Menu menu_init(void)
 {
     Menu menu = {0};
     menu.bg = light_gray;
 
-    Button start = make_button("START", 32,
-                               make_rect(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y - 120, 200, 80),
+    Button start = button_new("START", 32,
+                               rect_new(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y - 120, 200, 80),
                                BOX_STYLE_FLAG_ROUNDED | BOX_STYLE_FLAG_BORDER,
                                white, blue, black, 16, 4);
-    Button quit = make_button("QUIT", 32,
-                              make_rect(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y + 40, 200, 80),
+    Button quit = button_new("QUIT", 32,
+                              rect_new(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y + 40, 200, 80),
                               BOX_STYLE_FLAG_ROUNDED | BOX_STYLE_FLAG_BORDER,
                               white, red, black, 16, 4);
     menu.buttons.v[0] = start;
@@ -299,7 +297,7 @@ void overlay_init(void)
 internal inline void overlay_update_message(Overlay *overlay, u32 fps, f64 frame_average, V2f player_pos)
 {
     i32 bytes_written = sprintf(overlay->text, overlay->text_format,
-                                game.width, game.height,
+                                game.window_width, game.window_height,
                                 fps, frame_average, player_pos.x, player_pos.y);
 
     ASSERT(bytes_written < OVERLAY_TEXT_SIZE);
@@ -312,12 +310,12 @@ internal void overlay_next_state(void)
 
 void player_init(void)
 {
-    player.pos = v2f(4.0f * CELL_SIZE, 4.0f * CELL_SIZE);
+    player.pos = v2f(3.0f, 3.0f);
     player.dir = v2f(1.0f, 0.0f);
-    player.vel = 10000 / CELL_SIZE;
+    player.vel = 5;
     player.rotation_vel = 200;
     player.fov = M_PI_2;
-    player.angle_step = player.fov / (game.width - 1); 
+    player.angle_step = player.fov / (game.window_width - 1); 
     player.fov_color = black_transparent;
     player.radius = 6;
     player.color = blue;
@@ -355,53 +353,48 @@ void player_rotate_counterclockwise(f64 dt)
 
 internal inline Texture *get_texture_from_mtv(u32 mtv)
 {
-    u32 index = mtv - FIRST_TEXTURE_ID;
-    return &LIST_GET(game.textures, index);
+    return &LIST_GET(game.textures, mtv - FIRST_TEXTURE_ID);
 }
 
 internal Intersect get_intersect(V2f pos, V2f dir)
 {
-    V2f delta_dist = v2f(0, 0);
+    V2f delta_dist = v2f(dir.x == 0 ? FLT_MAX : fabs(1 / dir.x), dir.y == 0 ? FLT_MAX : fabs(1 / dir.y));
     V2f step       = v2f(0, 0);
     V2f side_dist  = v2f(0, 0);
-
-    delta_dist.x = dir.x == 0 ? FLT_MAX : fabs(CELL_SIZE / dir.x);
-    delta_dist.y = dir.y == 0 ? FLT_MAX : fabs(CELL_SIZE / dir.y);
-
-    V2f map_tile = v2f_scale(v2f_floor(v2f_scale(pos, 1.0f / CELL_SIZE)), CELL_SIZE);
+    V2f map_tile = v2f_floor(pos);
 
     if (dir.x < 0) {
         step.x = -1;
         side_dist.x = (pos.x - map_tile.x);
     } else {
         step.x = 1;
-        side_dist.x = (map_tile.x + CELL_SIZE - pos.x);
+        side_dist.x = (map_tile.x + 1.0f - pos.x);
     }
     if (dir.y < 0) {
         step.y = -1;
         side_dist.y = (pos.y - map_tile.y);
     } else {
         step.y = 1;
-        side_dist.y = (map_tile.y + CELL_SIZE - pos.y);
+        side_dist.y = (map_tile.y + 1.0f - pos.y);
     }
-
-    side_dist = v2f_mul(side_dist, v2f_scale(delta_dist, 1.0f / CELL_SIZE));
+    side_dist = v2f_mul(side_dist, delta_dist);
 
     Intersect intersect = {0};
 
     for (;;) {
         if (side_dist.x < side_dist.y) {
             side_dist.x += delta_dist.x;
-            map_tile.x += step.x * CELL_SIZE;
+            map_tile.x += step.x;
             intersect.horizontal = false;
         } else {
             side_dist.y += delta_dist.y;
-            map_tile.y += step.y * CELL_SIZE;
+            map_tile.y += step.y;
             intersect.horizontal = true;
         }
 
-        if (is_wall(map_tile.x, map_tile.y)) {
-            intersect.map_tile_value = get_map_tile(map_tile.x, map_tile.y);
+        i32 mtv = get_map_tile(map_tile.x, map_tile.y);
+        if (mtv >= 1) {
+            intersect.map_tile_value = mtv;
             break;
         }
     }
@@ -430,19 +423,18 @@ internal void draw_3d_view(Player player)
     //       this will make calculations faster?
 
     f32 angle_curr = -player.fov / 2.0f;
-    for (u32 x = 0; x < game.width; x++) {
+    for (u32 x = 0; x < game.window_width; x++) {
         V2f ray = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = get_intersect(player.pos, ray);
-        f32 rel_perp_wall_dist = intersect.perp_wall_dist / CELL_SIZE;
 
-        f32 wall_height = game.height / rel_perp_wall_dist;
-        f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.height / 2.0f), 0, game.height - 1);
+        f32 wall_height = game.window_height / intersect.perp_wall_dist;
+        f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.window_height / 2.0f), 0, game.window_height - 1);
         V2f window_start = v2f(x, 0);
         V2f wall_start = v2f(x, wall_top);
         platform_draw_line(light_blue, window_start, wall_start);
 
         if (intersect.map_tile_value == 1) {
-            f32 wall_bottom = CLAMP((wall_height / 2.0f) + (game.height / 2.0f), 0, game.height - 1);
+            f32 wall_bottom = CLAMP((wall_height / 2.0f) + (game.window_height / 2.0f), 0, game.window_height - 1);
             V2f wall_end = v2f(x, wall_bottom);
             Color wall_color = intersect.horizontal ? light_gray : gray;
             platform_draw_line(wall_color, wall_start, wall_end);
@@ -450,18 +442,19 @@ internal void draw_3d_view(Player player)
             Texture *texture = get_texture_from_mtv(intersect.map_tile_value);
 
             f32 wall_x = intersect.horizontal ?
-                player.pos.x / CELL_SIZE + rel_perp_wall_dist * ray.x :
-                player.pos.y / CELL_SIZE + rel_perp_wall_dist * ray.y;
+                player.pos.x + intersect.perp_wall_dist * ray.x :
+                player.pos.y + intersect.perp_wall_dist * ray.y;
             wall_x -= floor(wall_x);
+
             V2f texture_index = v2f(0, 0);
 
             texture_index.x = (i32)(wall_x * texture->width);
             if ((!intersect.horizontal && ray.x > 0.0f) || (intersect.horizontal && ray.y < 0.0f)) {
-                texture_index.x = texture->width - texture_index.x - 1;
+                texture_index.x = texture->width - texture_index.x - 1.0f;
             }
 
             f32 step = texture->height / wall_height;
-            f32 texture_pos = (wall_top - game.height / 2.0f + wall_height / 2.0f) * step;
+            f32 texture_pos = (wall_top - game.window_height / 2.0f + wall_height / 2.0f) * step;
 
             for (u32 y = 0; y < wall_height; y++, texture_pos += step) {
                 texture_index.y = (i32)texture_pos & (texture->height - 1);
@@ -483,17 +476,16 @@ internal void draw_3d_view(Player player)
 
 internal void draw_map_walls()
 {
-    for (u32 y = 0; y < game.height; y += CELL_SIZE) {
-        for (u32 x = 0; x < game.width; x += CELL_SIZE) {
-            Rect rect = make_rect(x, y, CELL_SIZE, CELL_SIZE);
-            if (is_wall(x, y)) {
-                u32 map_tile_value = get_map_tile(x, y);
-                if (map_tile_value == 1) {
-                    platform_draw_rect(light_gray, rect);
-                } else {
-                    Texture *texture = get_texture_from_mtv(map_tile_value);
-                    platform_draw_rect(texture->tile_color, rect);
-                }
+    for (u32 y = 0; y < game.map_height; y++) {
+        for (u32 x = 0; x < game.map_width; x++) {
+            u32 map_tile_value = get_map_tile(x, y);
+            Rect rect = rect_new(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+
+            if (map_tile_value == 1) {
+                platform_draw_rect(light_gray, rect);
+            } else if (map_tile_value > 1) {
+                Texture *texture = get_texture_from_mtv(map_tile_value);
+                platform_draw_rect(texture->tile_color, rect);
             }
         }
     }
@@ -501,18 +493,18 @@ internal void draw_map_walls()
 
 internal void draw_map_grid()
 {
-    for (u32 y = CELL_SIZE; y < game.height; y += CELL_SIZE) {
-        platform_draw_line(black, v2f(0, y), v2f(game.width, y));
+    for (u32 y = 1; y < game.map_height; y++) {
+        platform_draw_line(black, v2f(0, y * CELL_SIZE), v2f(game.window_width, y * CELL_SIZE));
     }
 
-    for (u32 x = CELL_SIZE; x < game.width; x += CELL_SIZE) {
-        platform_draw_line(black, v2f(x, 0), v2f(x, game.height));
+    for (u32 x = 1; x < game.map_width; x++) {
+        platform_draw_line(black, v2f(x * CELL_SIZE, 0), v2f(x * CELL_SIZE, game.window_height));
     }
 }
 
 internal void draw_map_player(u32 beam_spread)
 {
-    platform_draw_circle_filled(player.color, player.pos, player.radius);
+    platform_draw_circle_filled(player.color, v2f_scale(player.pos, CELL_SIZE), player.radius);
 
 #if 1 // Look at player fov
     f32 angle_curr  = -player.fov / 2.0f;
@@ -521,7 +513,7 @@ internal void draw_map_player(u32 beam_spread)
     for (; angle_curr <= angle_end; angle_curr += angle_step) {
         V2f curr_dir = v2f_rotate(player.dir, angle_curr);
         Intersect intersect = get_intersect(player.pos, curr_dir);
-        platform_draw_line(player.fov_color, player.pos, intersect.pos);
+        platform_draw_line(player.fov_color, v2f_scale(player.pos, CELL_SIZE), v2f_scale(intersect.pos, CELL_SIZE));
     }
 #else
     (void)beam_spread;
@@ -537,21 +529,19 @@ internal void draw_map()
 
 internal void draw_minimap_walls(f32 scale)
 {
-    f32 scaled_cell_size = CELL_SIZE * scale;
+    i32 scaled_cell_size = CELL_SIZE * scale;
 
-    for (u32 y = game.minimap_dims.y; y < game.minimap_dims.y + game.minimap_dims.h; y += scaled_cell_size) {
-        for (u32 x = game.minimap_dims.x; x < game.minimap_dims.x + game.minimap_dims.w; x += scaled_cell_size) {
-            if (is_wall((x - game.minimap_dims.x) / scale, (y - game.minimap_dims.y) / scale)) {
-                Rect rect = make_rect(x, y, scaled_cell_size, scaled_cell_size);
-                u32 map_tile_value =
-                    get_map_tile((x - game.minimap_dims.x) * CELL_SIZE / scaled_cell_size,
-                                 (y - game.minimap_dims.y) * CELL_SIZE / scaled_cell_size);
-                if (map_tile_value == 1) {
-                    platform_draw_rect(light_gray, rect);
-                } else {
-                    Texture *texture = get_texture_from_mtv(map_tile_value);
-                    platform_draw_rect(texture->tile_color, rect);
-                }
+    for (u32 y = 0; y < game.map_height; y++) {
+        for (u32 x = 0; x < game.map_width; x++) {
+            u32 map_tile_value = get_map_tile(x, y);
+            Rect rect = rect_new(x * scaled_cell_size + game.minimap_dims.x,
+                                 y * scaled_cell_size + game.minimap_dims.y,
+                                 scaled_cell_size, scaled_cell_size);
+            if (map_tile_value == 1) {
+                platform_draw_rect(light_gray, rect);
+            } else if (map_tile_value > 1){
+                Texture *texture = get_texture_from_mtv(map_tile_value);
+                platform_draw_rect(texture->tile_color, rect);
             }
         }
     }
@@ -561,18 +551,24 @@ internal void draw_minimap_grid(f32 scale)
 {
     f32 scaled_cell_size = CELL_SIZE * scale;
 
-    for (u32 y = game.minimap_dims.y + scaled_cell_size; y < game.minimap_dims.y + game.minimap_dims.h; y += scaled_cell_size) {
-        platform_draw_line(black, v2f(game.minimap_dims.x, y), v2f(game.minimap_dims.x + game.minimap_dims.w, y));
+    for (u32 y = 0; y <= game.map_height; y++) {
+        platform_draw_line(black,
+                           v2f(game.minimap_dims.x, game.minimap_dims.y + y * scaled_cell_size),
+                           v2f(game.minimap_dims.x + game.minimap_dims.w, game.minimap_dims.y + y * scaled_cell_size));
     }
 
-    for (u32 x = game.minimap_dims.x + scaled_cell_size ; x < game.minimap_dims.x + game.minimap_dims.w; x += scaled_cell_size) {
-        platform_draw_line(black, v2f(x, game.minimap_dims.y), v2f(x, game.minimap_dims.y + game.minimap_dims.h));
+    for (u32 x = 0; x <= game.map_width; x++) {
+        platform_draw_line(black,
+                           v2f(game.minimap_dims.x + x * scaled_cell_size, game.minimap_dims.y),
+                           v2f(game.minimap_dims.x + x * scaled_cell_size, game.minimap_dims.y + game.minimap_dims.h));
     }
 }
 
 internal void draw_minimap_player(f32 scale)
 {
-    V2f player_minimap_pos = v2f_add(v2f_scale(player.pos, scale), v2f(game.minimap_dims.x, game.minimap_dims.y));
+    f32 scaled_cell_size = CELL_SIZE * scale;
+
+    V2f player_minimap_pos = v2f_add(v2f_scale(player.pos, scaled_cell_size), v2f(game.minimap_dims.x, game.minimap_dims.y));
     platform_draw_circle_filled(blue, player_minimap_pos, 2);
 }
 
@@ -580,7 +576,9 @@ internal void draw_minimap()
 {
     platform_draw_rect(green, game.minimap_dims);
 
-    f32 scale = (f32)game.minimap_dims.w / game.width;
+    ASSERT(game.window_width % game.minimap_dims.w == 0);
+    f32 scale = (f32)game.minimap_dims.w / game.window_width;
+
     draw_minimap_walls(scale);
     draw_minimap_grid(scale);
     draw_minimap_player(scale);
@@ -620,7 +618,7 @@ internal void draw_menu(void)
 internal void draw_overlay(Overlay overlay)
 {
     V2f dims = platform_get_text_dims(overlay.ptsize, overlay.text);
-    overlay.rect = make_rect(0, 0, dims.x, dims.y);
+    overlay.rect = rect_new(0, 0, dims.x, dims.y);
     platform_draw_text(white, black_transparent, overlay.rect, overlay.text, overlay.ptsize);
 }
 
@@ -628,14 +626,17 @@ void game_init(void)
 {
     game.quit = false;
 
-    game.width = WINDOW_WIDTH;
-    game.height = WINDOW_HEIGHT;
+    game.window_width = WINDOW_WIDTH;
+    game.window_height = WINDOW_HEIGHT;
+
+    game.map_width = 16;
+    game.map_height = 12;
 
     game.minimap_dims = (Rect) {
-        .x = game.width * ((f32)3/4),
-        .y = 0,
-        .h = game.height * ((f32)1/4),
-        .w = game.width * ((f32)1/4)
+        .x = game.window_width  * (3.0f / 4.0f),
+        .y = game.window_height * (0.0f / 4.0f),
+        .h = game.window_height * (1.0f / 4.0f),
+        .w = game.window_width  * (1.0f / 4.0f)
     };
 
     game.mouse_state = (Mouse_State){0};
@@ -667,7 +668,7 @@ void game_init(void)
     // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"barrel.png"));
     // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"pillar.png"));
 
-    game.menu = create_menu();
+    game.menu = menu_init();
 }
 
 internal void game_view_toggle_map(void)
