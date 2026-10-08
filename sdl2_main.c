@@ -1,4 +1,4 @@
-#include "sdl_main.h"
+#include "sdl2_main.h"
 #include "utils.h"
 #include "vector.h"
 #include "game.h"
@@ -260,7 +260,7 @@ extern Game game;
 
 i32 main(void)
 {
-    platform_val_err(SDL_Init(SDL_INIT_EVERYTHING));
+    // platform_val_err(SDL_Init(SDL_INIT_EVERYTHING));
     platform_val_err(TTF_Init());
 
     window = platform_ptr_err(SDL_CreateWindow("Raycas", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,

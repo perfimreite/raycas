@@ -1,10 +1,10 @@
-#include "base.h"
-
 #include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_pixels.h>
 #include <SDL2/SDL_rect.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
+
+#include "base.h"
 
 typedef struct {
     const char *path;

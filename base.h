@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #ifndef BASE_H
 #define BASE_H
