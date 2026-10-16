@@ -14,7 +14,7 @@ sdl2_main_hd: $(SDL2_DEPENDECIES)
 
 # --- SDL 3 ---
 
-SDL2_DEPENDECIES = sdl3_main.c sdl3_main.h game.c game.h utils.c vector.c base.h
+SDL3_DEPENDECIES = sdl3_main.c sdl3_main.h game.c game.h utils.c vector.c base.h
 sdl3_main:$(SDL3_DEPENDECIES)
 	$(CC) $(CFLAGS) sdl3_main.c game.c utils.c vector.c -I/usr/include/SDL3 -Ithirdparty -lSDL3 -lSDL3_ttf -lm -o sdl3_main
 

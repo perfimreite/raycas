@@ -38,8 +38,8 @@ global i32 map[MAP_COUNT][ROWS][COLS] = {
     {
         {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
         {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1},
-        {1, 3, 0, 0, 0, 0, 2, 2, 0, 0, 0, 1, 1, 1, 0, 1},
-        {1, 3, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 3, 0, 0, 0, 0, 8, 2, 0, 0, 0, 1, 1, 1, 0, 1},
+        {1, 3, 0, 0, 0, 0, 9, 2, 0, 0, 0, 0, 0, 0, 0, 1},
         {1, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0, 1},
         {1, 3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1},
         {1, 3, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1},
@@ -361,7 +361,7 @@ internal Intersect get_intersect(V2f pos, V2f dir)
     V2f delta_dist = v2f(dir.x == 0 ? FLT_MAX : fabs(1 / dir.x), dir.y == 0 ? FLT_MAX : fabs(1 / dir.y));
     V2f step       = v2f(0, 0);
     V2f side_dist  = v2f(0, 0);
-    V2f map_tile = v2f_floor(pos);
+    V2f map_tile   = v2f_floor(pos);
 
     if (dir.x < 0) {
         step.x = -1;
@@ -381,7 +381,7 @@ internal Intersect get_intersect(V2f pos, V2f dir)
 
     Intersect intersect = {0};
 
-    for (;;) {
+    for (; intersect.map_tile_value < 1;) {
         if (side_dist.x < side_dist.y) {
             side_dist.x += delta_dist.x;
             map_tile.x += step.x;
@@ -392,11 +392,7 @@ internal Intersect get_intersect(V2f pos, V2f dir)
             intersect.horizontal = true;
         }
 
-        i32 mtv = get_map_tile(map_tile.x, map_tile.y);
-        if (mtv >= 1) {
-            intersect.map_tile_value = mtv;
-            break;
-        }
+        intersect.map_tile_value = get_map_tile(map_tile.x, map_tile.y);
     }
 
     intersect.perp_wall_dist = (intersect.horizontal ?
@@ -408,19 +404,49 @@ internal Intersect get_intersect(V2f pos, V2f dir)
 
 internal void draw_crosshair(Color color)
 {
-    i32 l = 5;
     platform_draw_line(color,
-                       v2f(WINDOW_CENTER_X, WINDOW_CENTER_Y - l),
-                       v2f(WINDOW_CENTER_X, WINDOW_CENTER_Y + l));
+                       v2f(WINDOW_CENTER_X, WINDOW_CENTER_Y - CROSSHAIR_LENGTH),
+                       v2f(WINDOW_CENTER_X, WINDOW_CENTER_Y + CROSSHAIR_LENGTH));
     platform_draw_line(color,
-                       v2f(WINDOW_CENTER_X - l, WINDOW_CENTER_Y),
-                       v2f(WINDOW_CENTER_X + l, WINDOW_CENTER_Y));
+                       v2f(WINDOW_CENTER_X - CROSSHAIR_LENGTH, WINDOW_CENTER_Y),
+                       v2f(WINDOW_CENTER_X + CROSSHAIR_LENGTH, WINDOW_CENTER_Y));
 }
 
 internal void draw_3d_view(Player player)
 {
     // TODO: numbers that correspond to pixel coords should be intergers.
     //       this will make calculations faster?
+
+    for (u32 y = 0; y < game.window_height; y++) {
+        V2f plane = v2f_rotate(player.dir, M_PI_2);
+        V2f ray0 = v2f_sub(player.dir, plane);
+        V2f ray1 = v2f_add(player.dir, plane);
+
+        i32 z = 0.5f * game.window_height;
+        i32 p = y - z;
+        f32 row_dist = z / (float)p;
+
+        V2f floor_step = v2f_scale(v2f_sub(ray1, ray0), row_dist / game.window_width);
+        V2f flr = v2f_add(player.pos, v2f_scale(ray0, row_dist));
+
+        for (u32 x = 0; x < game.window_width; x++) {
+            V2i texture_index = v2i_from_v2f(v2f_scale(v2f_sub(flr, v2f_floor(flr)), DEFAULT_TEXTURE_WIDTH));
+            texture_index.x = texture_index.x & (DEFAULT_TEXTURE_WIDTH - 1);
+            texture_index.y = texture_index.y & (DEFAULT_TEXTURE_HEIGHT - 1);
+
+            flr = v2f_add(flr, floor_step);
+
+            u32 pixel;
+            pixel = game.floor_texture.data[game.floor_texture.width * texture_index.y + texture_index.x];
+            platform_draw_point(color_from_u32(pixel), v2f(x, y));
+
+            pixel = game.ceil_texture.data[game.ceil_texture.width * texture_index.y + texture_index.x];
+            platform_draw_point(color_from_u32(pixel), v2f(x, game.window_height - y - 1));
+        }
+    }
+
+    // NOTE: This is for sky if it is not textured
+    // platform_draw_rect(light_blue, rect_new(0, 0, game.window_width, game.window_height / 2));
 
     f32 angle_curr = -player.fov / 2.0f;
     for (u32 x = 0; x < game.window_width; x++) {
@@ -429,9 +455,7 @@ internal void draw_3d_view(Player player)
 
         f32 wall_height = game.window_height / intersect.perp_wall_dist;
         f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.window_height / 2.0f), 0, game.window_height - 1);
-        V2f window_start = v2f(x, 0);
         V2f wall_start = v2f(x, wall_top);
-        platform_draw_line(light_blue, window_start, wall_start);
 
         if (intersect.map_tile_value == 1) {
             f32 wall_bottom = CLAMP((wall_height / 2.0f) + (game.window_height / 2.0f), 0, game.window_height - 1);
@@ -663,6 +687,9 @@ void game_init(void)
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"mossy.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"purplestone.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"wood.png"));
+
+    game.floor_texture = LIST_GET(game.textures, 4);
+    game.ceil_texture = LIST_GET(game.textures, 7);
 
     // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"greenlight.png"));
     // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"barrel.png"));

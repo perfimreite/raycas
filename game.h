@@ -7,8 +7,8 @@
     #define WINDOW_WIDTH 960
     #define WINDOW_HEIGHT 720
 #else
-    #define WINDOW_WIDTH 960
-    #define WINDOW_HEIGHT 720
+    #define WINDOW_WIDTH 640
+    #define WINDOW_HEIGHT 480
 #endif
 
 #define OVERLAY_TEXT_SIZE 128
@@ -31,6 +31,8 @@ static_assert(WINDOW_WIDTH / COLS == WINDOW_HEIGHT / ROWS, "Should be equal");
 
 #define TEXTURES_PATH "assets/wolfenstein_textures/"
 #define FIRST_TEXTURE_ID 2
+
+#define CROSSHAIR_LENGTH 5
 
 typedef struct {
     u32 x;
@@ -213,6 +215,8 @@ typedef struct {
     Color crosshair_color;
     b32 show_crosshair;
     Textures textures;
+    Texture ceil_texture;
+    Texture floor_texture;
 
     Menu menu;
 } Game;
