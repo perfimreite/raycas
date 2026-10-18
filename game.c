@@ -22,7 +22,7 @@ global const Color gray              = { .r = 63 , .g = 63 , .b = 63 , .a = 255 
 global const Color red               = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
 global const Color green             = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
 global const Color blue              = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
-global const Color light_blue        = { .r = 191, .g = 191, .b = 255, .a = 255 };
+// global const Color light_blue        = { .r = 191, .g = 191, .b = 255, .a = 255 };
 // global const Color magenta           = { .r = 255, .g = 0  , .b = 255, .a = 255 };
 // global const Color cyan              = { .r = 0  , .g = 255, .b = 255, .a = 255 };
 // global const Color orange            = { .r = 255, .g = 165, .b = 0  , .a = 255 };
@@ -38,8 +38,8 @@ global i32 map[MAP_COUNT][ROWS][COLS] = {
     {
         {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
         {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1},
-        {1, 3, 0, 0, 0, 0, 8, 2, 0, 0, 0, 1, 1, 1, 0, 1},
-        {1, 3, 0, 0, 0, 0, 9, 2, 0, 0, 0, 0, 0, 0, 0, 1},
+        {1, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 1, 1, 1, 0, 1},
+        {1, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0, 1},
         {1, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0, 1},
         {1, 3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1},
         {1, 3, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1},
@@ -238,8 +238,8 @@ internal Rect rect_shrink(Rect rect, i32 k)
 }
 
 internal Box box_new(const char *text, i32 ptsize, Rect rect,
-                      Box_Style_Flag box_style_flag, Color fg, Color bg,
-                      Color border_color, i32 border_radius, i32 border_thickness)
+                     Box_Style_Flag box_style_flag, Color fg, Color bg,
+                     Color border_color, i32 border_radius, i32 border_thickness)
 {
     return (Box) {
         .text = text,
@@ -255,8 +255,8 @@ internal Box box_new(const char *text, i32 ptsize, Rect rect,
 }
 
 internal Button button_new(const char *text, i32 ptsize, Rect rect,
-                            Box_Style_Flag box_style_flag, Color fg, Color bg,
-                            Color border_color, i32 border_radius, i32 border_thickness)
+                           Box_Style_Flag box_style_flag, Color fg, Color bg,
+                           Color border_color, i32 border_radius, i32 border_thickness)
 {
     return (Button) {
         .pressed = false,
@@ -417,31 +417,29 @@ internal void draw_3d_view(Player player)
     // TODO: numbers that correspond to pixel coords should be intergers.
     //       this will make calculations faster?
 
-    for (u32 y = 0; y < game.window_height; y++) {
-        V2f plane = v2f_rotate(player.dir, M_PI_2);
-        V2f ray0 = v2f_sub(player.dir, plane);
-        V2f ray1 = v2f_add(player.dir, plane);
+    V2f plane = v2f_rotate(player.dir, M_PI_2);
+    V2f ray0 = v2f_sub(player.dir, plane);
+    V2f ray1 = v2f_add(player.dir, plane);
 
-        i32 z = 0.5f * game.window_height;
-        i32 p = y - z;
-        f32 row_dist = z / (float)p;
+    for (u32 y = game.window_height / 2 + 1; y < game.window_height; y++) {
+        f32 row_dist = WINDOW_CENTER_Y / (y - WINDOW_CENTER_Y);
 
         V2f floor_step = v2f_scale(v2f_sub(ray1, ray0), row_dist / game.window_width);
         V2f flr = v2f_add(player.pos, v2f_scale(ray0, row_dist));
 
         for (u32 x = 0; x < game.window_width; x++) {
-            V2i texture_index = v2i_from_v2f(v2f_scale(v2f_sub(flr, v2f_floor(flr)), DEFAULT_TEXTURE_WIDTH));
-            texture_index.x = texture_index.x & (DEFAULT_TEXTURE_WIDTH - 1);
-            texture_index.y = texture_index.y & (DEFAULT_TEXTURE_HEIGHT - 1);
+            V2f texture_index = v2f_scale(v2f_sub(flr, v2f_floor(flr)), DEFAULT_TEXTURE_WIDTH);
+            texture_index.x = (i32)texture_index.x & (DEFAULT_TEXTURE_WIDTH - 1);
+            texture_index.y = (i32)texture_index.y & (DEFAULT_TEXTURE_HEIGHT - 1);
 
             flr = v2f_add(flr, floor_step);
 
             u32 pixel;
-            pixel = game.floor_texture.data[game.floor_texture.width * texture_index.y + texture_index.x];
-            platform_draw_point(color_from_u32(pixel), v2f(x, y));
+            pixel = game.floor_texture.data[(i32)(game.floor_texture.width * texture_index.y + texture_index.x)];
+            game.frame_buffer[game.window_width * y + x] = pixel;
 
-            pixel = game.ceil_texture.data[game.ceil_texture.width * texture_index.y + texture_index.x];
-            platform_draw_point(color_from_u32(pixel), v2f(x, game.window_height - y - 1));
+            pixel = game.ceil_texture.data[(i32)(game.ceil_texture.width * texture_index.y + texture_index.x)];
+            game.frame_buffer[game.window_width * (game.window_height - y - 1) + x] = pixel;
         }
     }
 
@@ -455,13 +453,14 @@ internal void draw_3d_view(Player player)
 
         f32 wall_height = game.window_height / intersect.perp_wall_dist;
         f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.window_height / 2.0f), 0, game.window_height - 1);
-        V2f wall_start = v2f(x, wall_top);
 
         if (intersect.map_tile_value == 1) {
             f32 wall_bottom = CLAMP((wall_height / 2.0f) + (game.window_height / 2.0f), 0, game.window_height - 1);
-            V2f wall_end = v2f(x, wall_bottom);
             Color wall_color = intersect.horizontal ? light_gray : gray;
-            platform_draw_line(wall_color, wall_start, wall_end);
+
+            for (i32 y = (i32)wall_top; y <= (i32)wall_bottom; y++) {
+                game.frame_buffer[game.window_width * y + x] = u32_from_color(wall_color);
+            }
         } else {
             Texture *texture = get_texture_from_mtv(intersect.map_tile_value);
 
@@ -480,17 +479,17 @@ internal void draw_3d_view(Player player)
             f32 step = texture->height / wall_height;
             f32 texture_pos = (wall_top - game.window_height / 2.0f + wall_height / 2.0f) * step;
 
-            for (u32 y = 0; y < wall_height; y++, texture_pos += step) {
+            for (u32 y = 0; y < wall_height && y < game.window_height; y++, texture_pos += step) {
                 texture_index.y = (i32)texture_pos & (texture->height - 1);
 
                 u32 pixel = texture->data[(i32)(texture->width * texture_index.x + texture_index.y)];
                 if (intersect.horizontal) {
                     // NOTE: `&` with binary number to set last
                     // bit of every byte to zero after the `>>`
-                    pixel = (pixel >> 1) & 8355711; // 0b011111110111111101111111
+                    pixel = (pixel & 0xFF000000) | ((pixel >> 1) & 0x007F7F7F);
                 }
 
-                platform_draw_point(color_from_u32(pixel), v2f(x, y + wall_top));
+                game.frame_buffer[game.window_width * (i32)(y + wall_top) + x] = pixel;
             }
         }
 
@@ -652,6 +651,8 @@ void game_init(void)
 
     game.window_width = WINDOW_WIDTH;
     game.window_height = WINDOW_HEIGHT;
+    game.frame_buffer = malloc(WINDOW_WIDTH * WINDOW_HEIGHT * sizeof(*game.frame_buffer));
+    game.stride = WINDOW_WIDTH * sizeof(*game.frame_buffer);
 
     game.map_width = 16;
     game.map_height = 12;
@@ -802,6 +803,8 @@ void game_render(f64 dt)
         case VIEW_GAME: {
             platform_clear_backbuffer(green);
             draw_3d_view(player);
+            platform_update_texture(game.frame_buffer, game.stride);
+            platform_render_frame_texture();
             draw_minimap();
 
             if (game.show_crosshair) {

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Wpedantic
+CFLAGS = -Wall -Wextra -Wpedantic -g
 
 all: sdl2_main sdl2_main_hd sdl3_main sdl3_main_hd
 

@@ -28,6 +28,7 @@ internal Font *get_font(i32 ptsize)
 
 global SDL_Window *window = NULL;
 global SDL_Renderer *renderer = NULL;
+global SDL_Texture *frame_texture = NULL;
 
 internal void platform_val_err(i32 code)
 {
@@ -180,6 +181,21 @@ void platform_draw_triangle(Color fg, Color bg, V2f a, V2f b, V2f c)
     // TODO: Implement platform_draw_triangle
 }
 
+void platform_update_texture(u32 *frame_buffer, u32 pitch)
+{
+    platform_val_err(SDL_UpdateTexture(frame_texture, NULL, frame_buffer, pitch));
+}
+
+void platform_render_texture(SDL_Texture *texture)
+{
+    platform_val_err(SDL_RenderCopy(renderer, texture, NULL, NULL));
+}
+
+void platform_render_frame_texture()
+{
+    platform_render_texture(frame_texture);
+}
+
 void platform_clear_backbuffer(Color color)
 {
     platform_val_err(SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a));
@@ -272,6 +288,14 @@ i32 main(void)
     game_init();
     overlay_init();
     player_init();
+
+    frame_texture = platform_ptr_err(SDL_CreateTexture(
+            renderer,
+            SDL_PIXELFORMAT_ARGB8888,
+            SDL_TEXTUREACCESS_STREAMING,
+            game.window_width,
+            game.window_height
+    ));
 
     Frame_Time frame_time = {0};
 

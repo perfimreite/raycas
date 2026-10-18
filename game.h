@@ -200,6 +200,9 @@ typedef struct {
     u32 window_width;
     u32 window_height;
 
+    u32 stride;
+    u32 *frame_buffer;
+
     u32 map_width;
     u32 map_height;
 
@@ -239,6 +242,8 @@ void platform_draw_circle_filled(Color color, V2f a, i32 radius);
 void platform_draw_rect(Color color, Rect rect);
 void platform_draw_rect_rounded(Color color, Rect rect, i32 radius);
 void platform_draw_triangle(Color fg, Color bg, V2f a, V2f b, V2f c);
+void platform_update_texture(u32 *frame_buffer, u32 pitch);
+void platform_render_frame_texture();
 V2f  platform_get_text_dims(i32 ptsize, const char *text);
 Rect platform_center_text_in_rect(Rect rect, i32 ptsize, const char *text);
 void platform_draw_text(Color fg, Color bg, Rect rect, const char *text, i32 ptsize);
