@@ -20,7 +20,7 @@ global const Color white             = { .r = 255, .g = 255, .b = 255, .a = 255 
 global const Color light_gray        = { .r = 127, .g = 127, .b = 127, .a = 255 };
 global const Color gray              = { .r = 63 , .g = 63 , .b = 63 , .a = 255 };
 global const Color red               = { .r = 255, .g = 0  , .b = 0  , .a = 255 };
-global const Color green             = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
+// global const Color green             = { .r = 0  , .g = 255, .b = 0  , .a = 255 };
 global const Color blue              = { .r = 0  , .g = 0  , .b = 255, .a = 255 };
 // global const Color light_blue        = { .r = 191, .g = 191, .b = 255, .a = 255 };
 // global const Color magenta           = { .r = 255, .g = 0  , .b = 255, .a = 255 };
@@ -36,18 +36,18 @@ Game game              = {0};
 
 global i32 map[MAP_COUNT][ROWS][COLS] = {
     {
-        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-        {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1},
-        {1, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 1, 1, 1, 0, 1},
-        {1, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0, 1},
-        {1, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0, 1},
-        {1, 3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 1},
-        {1, 3, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 1},
-        {1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-        {1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
-        {1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-        {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
-        {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+        {7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7},
+        {7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 0, 4},
+        {8, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 7, 7, 7, 0, 4},
+        {8, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0, 4},
+        {8, 3, 0, 0, 0, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0, 4},
+        {8, 3, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 4},
+        {8, 3, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 4},
+        {8, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+        {8, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4},
+        {8, 0, 0, 0, 0, 0, 8, 8, 0, 0, 0, 0, 0, 0, 0, 4},
+        {8, 0, 0, 0, 0, 0, 8, 0, 0, 0, 8, 8, 0, 0, 0, 4},
+        {8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4},
     },
     {
         {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
@@ -312,6 +312,7 @@ void player_init(void)
 {
     player.pos = v2f(3.0f, 3.0f);
     player.dir = v2f(1.0f, 0.0f);
+    player.plane = v2f(0.0f, 1.0f);
     player.vel = 5;
     player.rotation_vel = 200;
     player.fov = M_PI_2;
@@ -344,11 +345,13 @@ void player_move_backward(f64 dt)
 void player_rotate_clockwise(f64 dt)
 {
     player.dir = v2f_rotate(player.dir, radians_from_degrees(player.rotation_vel) * dt);
+    player.plane = v2f_normal(player.dir);
 }
 
 void player_rotate_counterclockwise(f64 dt)
 {
     player.dir = v2f_rotate(player.dir, radians_from_degrees(-player.rotation_vel) * dt);
+    player.plane = v2f_normal(player.dir);
 }
 
 internal inline Texture *get_texture_from_mtv(u32 mtv)
@@ -417,22 +420,22 @@ internal void draw_3d_view(Player player)
     // TODO: numbers that correspond to pixel coords should be intergers.
     //       this will make calculations faster?
 
-    V2f plane = v2f_rotate(player.dir, M_PI_2);
-    V2f ray0 = v2f_sub(player.dir, plane);
-    V2f ray1 = v2f_add(player.dir, plane);
+    V2f ray0 = v2f_sub(player.dir, player.plane);
+    V2f ray1 = v2f_add(player.dir, player.plane);
 
     for (u32 y = game.window_height / 2 + 1; y < game.window_height; y++) {
         f32 row_dist = WINDOW_CENTER_Y / (y - WINDOW_CENTER_Y);
 
-        V2f floor_step = v2f_scale(v2f_sub(ray1, ray0), row_dist / game.window_width);
-        V2f flr = v2f_add(player.pos, v2f_scale(ray0, row_dist));
+        V2f step = v2f_scale(v2f_sub(ray1, ray0), row_dist / game.window_width);
+        V2f floor_pos = v2f_add(player.pos, v2f_scale(ray0, row_dist));
 
         for (u32 x = 0; x < game.window_width; x++) {
-            V2f texture_index = v2f_scale(v2f_sub(flr, v2f_floor(flr)), DEFAULT_TEXTURE_WIDTH);
+            V2f cell = v2f_floor(floor_pos);
+            V2f texture_index = v2f_scale(v2f_sub(floor_pos, cell), DEFAULT_TEXTURE_WIDTH);
             texture_index.x = (i32)texture_index.x & (DEFAULT_TEXTURE_WIDTH - 1);
             texture_index.y = (i32)texture_index.y & (DEFAULT_TEXTURE_HEIGHT - 1);
 
-            flr = v2f_add(flr, floor_step);
+            floor_pos = v2f_add(floor_pos, step);
 
             u32 pixel;
             pixel = game.floor_texture.data[(i32)(game.floor_texture.width * texture_index.y + texture_index.x)];
@@ -440,15 +443,32 @@ internal void draw_3d_view(Player player)
 
             pixel = game.ceil_texture.data[(i32)(game.ceil_texture.width * texture_index.y + texture_index.x)];
             game.frame_buffer[game.window_width * (game.window_height - y - 1) + x] = pixel;
+
+            // For checkerboard pattern
+            // if (((i32)cell.x + (i32)cell.y) & 1) {
+            //     u32 pixel;
+            //     pixel = game.floor_texture.data[(i32)(game.floor_texture.width * texture_index.y + texture_index.x)];
+            //     game.frame_buffer[game.window_width * y + x] = pixel;
+            //
+            //     pixel = game.ceil_texture.data[(i32)(game.ceil_texture.width * texture_index.y + texture_index.x)];
+            //     game.frame_buffer[game.window_width * (game.window_height - y - 1) + x] = pixel;
+            // } else {
+            //     u32 pixel;
+            //     pixel = game.floor_texture.data[(i32)(game.floor_texture.width * texture_index.y + texture_index.x)];
+            //     game.frame_buffer[game.window_width * (game.window_height - y - 1)  + x] = pixel;
+            //
+            //     pixel = game.ceil_texture.data[(i32)(game.ceil_texture.width * texture_index.y + texture_index.x)];
+            //     game.frame_buffer[game.window_width * y + x] = pixel;
+            // }
         }
     }
 
     // NOTE: This is for sky if it is not textured
     // platform_draw_rect(light_blue, rect_new(0, 0, game.window_width, game.window_height / 2));
 
-    f32 angle_curr = -player.fov / 2.0f;
     for (u32 x = 0; x < game.window_width; x++) {
-        V2f ray = v2f_rotate(player.dir, angle_curr);
+        f32 camera_x = 2.0f * x / (f32)game.window_width - 1.0f;
+        V2f ray = v2f_add(player.dir, v2f_scale(player.plane, camera_x));
         Intersect intersect = get_intersect(player.pos, ray);
 
         f32 wall_height = game.window_height / intersect.perp_wall_dist;
@@ -479,8 +499,9 @@ internal void draw_3d_view(Player player)
             f32 step = texture->height / wall_height;
             f32 texture_pos = (wall_top - game.window_height / 2.0f + wall_height / 2.0f) * step;
 
-            for (u32 y = 0; y < wall_height && y < game.window_height; y++, texture_pos += step) {
+            for (u32 y = 0; y < wall_height && y < game.window_height; y++) {
                 texture_index.y = (i32)texture_pos & (texture->height - 1);
+                texture_pos += step;
 
                 u32 pixel = texture->data[(i32)(texture->width * texture_index.x + texture_index.y)];
                 if (intersect.horizontal) {
@@ -492,8 +513,6 @@ internal void draw_3d_view(Player player)
                 game.frame_buffer[game.window_width * (i32)(y + wall_top) + x] = pixel;
             }
         }
-
-        angle_curr += player.angle_step;
     }
 }
 
@@ -597,7 +616,7 @@ internal void draw_minimap_player(f32 scale)
 
 internal void draw_minimap()
 {
-    platform_draw_rect(green, game.minimap_dims);
+    platform_draw_rect(game.floor_texture.tile_color, game.minimap_dims);
 
     ASSERT(game.window_width % game.minimap_dims.w == 0);
     f32 scale = (f32)game.minimap_dims.w / game.window_width;
@@ -679,7 +698,6 @@ void game_init(void)
 
     game.textures = (Textures){0};
 
-    // LIST_PUSH(game.textures, load_texture_from_file("assets/wall.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"redbrick.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"bluestone.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"colorstone.png"));
@@ -688,6 +706,9 @@ void game_init(void)
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"mossy.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"purplestone.png"));
     LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"wood.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"barrel.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"greenlight.png"));
+    LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"pillar.png"));
 
     game.floor_texture = LIST_GET(game.textures, 4);
     game.ceil_texture = LIST_GET(game.textures, 7);
@@ -801,7 +822,7 @@ void game_render(f64 dt)
         default: {} break;
 
         case VIEW_GAME: {
-            platform_clear_backbuffer(green);
+            platform_clear_backbuffer(black);
             draw_3d_view(player);
             platform_update_texture(game.frame_buffer, game.stride);
             platform_render_frame_texture();
@@ -813,7 +834,7 @@ void game_render(f64 dt)
         } break;
 
         case VIEW_MAP: {
-            platform_clear_backbuffer(green);
+            platform_clear_backbuffer(game.floor_texture.tile_color);
             draw_map();
         } break;
 
