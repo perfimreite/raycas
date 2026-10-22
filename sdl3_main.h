@@ -15,9 +15,15 @@ typedef struct {
 
 typedef struct {
     Font *items;
-    u32 count;
-    u32 capacity;
+    u64 count;
+    u64 capacity;
 } Fonts;
+
+typedef struct {
+    SDL_AudioStream **items;
+    u64 count;
+    u64 capacity;
+} Audio_Streams;
 
 typedef struct {
     f64 start;

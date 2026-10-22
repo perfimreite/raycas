@@ -2,12 +2,13 @@
 #include "utils.h"
 #include "vector.h"
 #include "game.h"
+#include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_render.h>
 #include <stdlib.h>
 
 global Fonts fonts = {0};
 
-internal Font font_init(const char *path, i32 ptsize)
+internal Font font_new(const char *path, i32 ptsize)
 {
     return (Font) {
         .path = path,
@@ -24,17 +25,17 @@ internal Font *get_font(i32 ptsize)
         }
     }
 
-    LIST_PUSH(fonts, font_init(FONT_FILE, ptsize));
+    LIST_PUSH(fonts, font_new(FONT_FILE, ptsize));
     return &LIST_LAST(fonts);
 }
 
-global SDL_Window *window = NULL;
-global SDL_Renderer *renderer = NULL;
-global SDL_Texture *frame_texture = NULL;
+global SDL_Window *window;
+global SDL_Renderer *renderer;
+global SDL_Texture *frame_texture;
 
 internal void platform_val_err(i32 code)
 {
-    if (code < 0) {
+    if (code <= 0) {
         fprintf(stderr, "SDL ERROR: %s\n", SDL_GetError());
         exit(1);
     }
@@ -274,6 +275,31 @@ void platform_set_cursor(Cursor_Kind cursor)
     }
 }
 
+global i32 audio_device;
+global Audio_Streams audio_streams;
+
+void platform_load_wav(Sound *sound)
+{
+    local_persist u64 stream_index = 0;
+    SDL_AudioSpec spec;
+    platform_val_err(SDL_LoadWAV(sound->file_path, &spec, &sound->data, &sound->count));
+
+
+    SDL_AudioStream *stream = platform_ptr_err(SDL_CreateAudioStream(&spec, NULL));
+    platform_val_err(SDL_BindAudioStream(audio_device, stream));
+
+    LIST_PUSH(audio_streams, stream);
+    sound->stream_index = stream_index++;
+}
+
+void platform_play_wav(Sound sound)
+{
+    SDL_AudioStream *stream = LIST_GET(audio_streams, sound.stream_index);
+    if (SDL_GetAudioStreamQueued(stream) < (i32)sound.count) {
+        SDL_PutAudioStreamData(stream, sound.data, sound.count);
+    }
+}
+
 extern Game game;
 
 i32 main(void)
@@ -282,6 +308,14 @@ i32 main(void)
     platform_val_err(TTF_Init());
 
     platform_val_err(SDL_CreateWindowAndRenderer("Raycas", WINDOW_WIDTH, WINDOW_HEIGHT, 0, &window, &renderer));
+
+    if (!SDL_Init(SDL_INIT_AUDIO)) {
+        fprintf(stdout, "ERROR: Failed to initialize SDL: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+
     SDL_Event event = {0};
     const bool *keystate = NULL;
 
@@ -374,6 +408,7 @@ i32 main(void)
 
         SDL_RenderPresent(renderer);
 
+
         // compute delta time
         frame_time.end = time_in_seconds();
         frame_time.dt = frame_time.end - frame_time.start;
@@ -384,4 +419,7 @@ i32 main(void)
 
     return 0;
 }
+
+// TODO
+//  - Better handle SDL return error values (-1, 0, bool, NULL...)
 

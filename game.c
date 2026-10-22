@@ -116,40 +116,40 @@ internal Texture get_fallback_texture(void)
             u32 y_color   =  x * 256 / texture.height;
             // u32 xy_color  =  x * 128 / texture.height + y * 128 / texture.width;
 
-            // texture.data[texture.width * x + y] = 65536 * 254 * (y != x && y != texture.width - x); // flat red texture with black cross
-            // texture.data[texture.width * x + y] = xy_color + 256 * xy_color + 65536 * xy_color;     // sloped greyscale
-            // texture.data[texture.width * x + y] = 256 * xy_color + 65536 * xy_color;                // sloped yellow gradient
-            // texture.data[texture.width * x + y] = xor_color + 256 * xor_color + 65536 * xor_color;  // xor greyscale
-            // texture.data[texture.width * x + y] = 256 * xor_color;                                  // xor green
-            // texture.data[texture.width * x + y] = 65536 * 192 * (x % 16 && y % 16);                 // red bricks
-            texture.data[texture.width * x + y] = (u32)65536 * y_color;                                  // red gradient
-            // texture.data[texture.width * x + y] = 128 + 256 * 128 + 65536 * 128;                    // flat grey texture
+            // texture.data[texture.width * y + x] = 65536 * 254 * (y != x && y != texture.width - x); // flat red texture with black cross
+            // texture.data[texture.width * y + x] = xy_color + 256 * xy_color + 65536 * xy_color;     // sloped greyscale
+            // texture.data[texture.width * y + x] = 256 * xy_color + 65536 * xy_color;                // sloped yellow gradient
+            // texture.data[texture.width * y + x] = xor_color + 256 * xor_color + 65536 * xor_color;  // xor greyscale
+            // texture.data[texture.width * y + x] = 256 * xor_color;                                  // xor green
+            // texture.data[texture.width * y + x] = 65536 * 192 * (x % 16 && y % 16);                 // red bricks
+            texture.data[texture.width * y + x] = (u32)65536 * y_color;                                  // red gradient
+            // texture.data[texture.width * y + x] = 128 + 256 * 128 + 65536 * 128;                    // flat grey texture
         }
     }
 
     return texture;
 }
 
-internal char *get_file_name_from_path(const char *path)
+internal char *get_file_name_from_path(const char *file_path)
 {
-    u32 len = strlen(path);
+    u32 len = strlen(file_path);
     char *file_name = malloc(len + 1);
 
     u32 j = 0;
     for (u32 i = 0; i < len; i++) {
-        if (path[i] == '/') {
+        if (file_path[i] == '/') {
             file_name = &file_name[j+1];
             j = 0;
             continue;
-        } else if (path[i] == '.') {
+        } else if (file_path[i] == '.') {
             for (u32 k = i + 1; k < len; k++) {
-                if (path[k] == '/') {
+                if (file_path[k] == '/') {
                     continue;
                 }
             }
             break;
         }
-        file_name[j++] = path[i];
+        file_name[j++] = file_path[i];
     }
 
     file_name[j] = '\0';
@@ -200,7 +200,7 @@ internal Texture load_texture_from_file(const char *file_path)
             for (u32 y = 0; y < texture.height; y++) {
                 for (u32 x = 0; x < texture.width; x++) {
                     // Swap blue and red bytes to match color interpretation of `Color`
-                    texture.data[texture.height * x + y] =
+                    texture.data[texture.width * y + x] =
                         ( data[texture.width * y + x] & 0xFF00FF00) |
                         ((data[texture.width * y + x] & 0x00FF0000) >> 16) |
                         ((data[texture.width * y + x] & 0x000000FF) << 16);
@@ -268,8 +268,6 @@ internal Button button_new(const char *text, i32 ptsize, Rect rect,
 internal Menu menu_init(void)
 {
     Menu menu = {0};
-    menu.bg = light_gray;
-
     Button start = button_new("START", 32,
                                rect_new(WINDOW_CENTER_X - 100, WINDOW_CENTER_Y - 120, 200, 80),
                                BOX_STYLE_FLAG_ROUNDED | BOX_STYLE_FLAG_BORDER,
@@ -284,17 +282,27 @@ internal Menu menu_init(void)
     // Check that right amount of buttons are in union
     ASSERT(&menu.buttons.button_end - &menu.buttons.v[0] == ARRAY_COUNT(menu.buttons.v));
 
+    menu.button_sound = (Sound){0};
+    menu.button_sound.file_path = SOUND_DIR"button_click.wav";
+    platform_load_wav(&menu.button_sound);
+
+    menu.transition_sound= (Sound){0};
+    menu.transition_sound.file_path = SOUND_DIR"transition.wav";
+    platform_load_wav(&menu.transition_sound);
+
+    menu.bg = light_gray;
+
     return menu;
 }
 
 void overlay_init(void)
 {
     overlay.state = OVERLAY_STATE_HIDDEN;
-    overlay.text_format = "RESOLUTION:%dx%d FPS:%d AVERAGE_FPS:%.1lf POS:(%.1f, %.1f)";
+    overlay.text_format = "RESOLUTION:%dx%d FPS:%d (AVG:%d) POS:(%.1f, %.1f)";
     overlay.ptsize = 16;
 }
 
-internal inline void overlay_update_message(Overlay *overlay, u32 fps, f64 frame_average, V2f player_pos)
+internal inline void overlay_update_message(Overlay *overlay, u32 fps, u32 frame_average, V2f player_pos)
 {
     i32 bytes_written = sprintf(overlay->text, overlay->text_format,
                                 game.window_width, game.window_height,
@@ -415,10 +423,35 @@ internal void draw_crosshair(Color color)
                        v2f(WINDOW_CENTER_X + CROSSHAIR_LENGTH, WINDOW_CENTER_Y));
 }
 
+f32 z_buffer[WINDOW_WIDTH];
+
+void entities_sort()
+{
+    if (game.entities.count == 0) {
+        return;
+    }
+
+    while (true){
+        b32 changed = false;
+        for (u32 i = 0; i < game.entities.count - 1; i++) {
+            if (game.entities.items[i].square_dist_to_player < game.entities.items[i + 1].square_dist_to_player) {
+                // 0x1 0x2    t -> 0x2
+                //  a   b
+                Entity temp = LIST_GET(game.entities, i + 1);
+                *LIST_GET_PTR(game.entities, i + 1) = LIST_GET(game.entities, i);
+                *LIST_GET_PTR(game.entities, i) = temp;
+                changed = true;
+            }
+        }
+        if (!changed) {
+            break;
+        }
+    }
+}
+
 internal void draw_3d_view(Player player)
 {
-    // TODO: numbers that correspond to pixel coords should be intergers.
-    //       this will make calculations faster?
+    // Floor and ceiling casting
 
     V2f ray0 = v2f_sub(player.dir, player.plane);
     V2f ray1 = v2f_add(player.dir, player.plane);
@@ -466,10 +499,14 @@ internal void draw_3d_view(Player player)
     // NOTE: This is for sky if it is not textured
     // platform_draw_rect(light_blue, rect_new(0, 0, game.window_width, game.window_height / 2));
 
+    // Wall Casting
+
     for (u32 x = 0; x < game.window_width; x++) {
         f32 camera_x = 2.0f * x / (f32)game.window_width - 1.0f;
         V2f ray = v2f_add(player.dir, v2f_scale(player.plane, camera_x));
         Intersect intersect = get_intersect(player.pos, ray);
+
+        z_buffer[x] = intersect.perp_wall_dist;
 
         f32 wall_height = game.window_height / intersect.perp_wall_dist;
         f32 wall_top = CLAMP((-wall_height / 2.0f) + (game.window_height / 2.0f), 0, game.window_height - 1);
@@ -503,7 +540,7 @@ internal void draw_3d_view(Player player)
                 texture_index.y = (i32)texture_pos & (texture->height - 1);
                 texture_pos += step;
 
-                u32 pixel = texture->data[(i32)(texture->width * texture_index.x + texture_index.y)];
+                u32 pixel = texture->data[(i32)(texture->width * texture_index.y + texture_index.x)];
                 if (intersect.horizontal) {
                     // NOTE: `&` with binary number to set last
                     // bit of every byte to zero after the `>>`
@@ -511,6 +548,51 @@ internal void draw_3d_view(Player player)
                 }
 
                 game.frame_buffer[game.window_width * (i32)(y + wall_top) + x] = pixel;
+            }
+        }
+    }
+
+    // Entity Casting
+
+    LIST_FOR_EACH(Entity, game.entities, entity) {
+        entity->rel_pos = v2f_sub(entity->pos, player.pos);
+        entity->square_dist_to_player = v2f_square_len(entity->rel_pos);
+    }
+
+    entities_sort();
+
+    LIST_FOR_EACH(Entity, game.entities, entity) {
+        f32 inv_det = 1.0f / (player.plane.x * player.dir.y - player.dir.x * player.plane.y);
+
+        V2f transform = v2f(inv_det * (player.dir.y * entity->rel_pos.x - player.dir.x * entity->rel_pos.y),
+                            inv_det * (-player.plane.y * entity->rel_pos.x + player.plane.x * entity->rel_pos.y));
+
+        i32 entity_screen_x = (i32)((game.window_width / 2.0f) * (1.0f + transform.x / transform.y));
+
+        i32 entity_height = abs((i32)(game.window_height / (transform.y)));
+        i32 draw_start_y  = MAX(-entity_height / 2 + (i32)game.window_height / 2, 0);
+        i32 draw_end_y    = MIN( entity_height / 2 + (i32)game.window_height / 2, (i32)game.window_height - 1);
+
+        i32 entity_width = abs((i32)(game.window_width / (transform.y)));
+        i32 draw_start_x = MAX(-entity_width / 2 + entity_screen_x, 0);
+        i32 draw_end_x   = MIN( entity_width / 2 + entity_screen_x, (i32)game.window_width - 1);
+
+        for(i32 x = draw_start_x; x < draw_end_x; x++) {
+            i32 texX = (i32)(256 * (x - (-entity_width / 2 + entity_screen_x)) * entity->texture->width / entity_width) / 256;
+            texX = CLAMP(texX, 0, (i32)entity->texture->width - 1);
+
+            if(transform.y > 0 && x > 0 && x < (i32)game.window_width && transform.y < z_buffer[x]) {
+                for(i32 y = draw_start_y ; y < draw_end_y; y++) {
+                    i32 d = y * 256 - game.window_height * 128 + entity_height * 128;
+
+                    i32 texY = ((d * entity->texture->height) / entity_height) / 256;
+                    texY = CLAMP(texY, 0, (i32)entity->texture->height - 1);
+
+                    u32 pixel = entity->texture->data[entity->texture->width * texY + texX];
+                    if((pixel & 0x00FFFFFF) != 0) {
+                        game.frame_buffer[game.window_width * y + x] = pixel;
+                    }
+                }
             }
         }
     }
@@ -549,12 +631,10 @@ internal void draw_map_player(u32 beam_spread)
     platform_draw_circle_filled(player.color, v2f_scale(player.pos, CELL_SIZE), player.radius);
 
 #if 1 // Look at player fov
-    f32 angle_curr  = -player.fov / 2.0f;
-    f32 angle_end   =  player.fov / 2.0f;
-    f32 angle_step  =  player.angle_step * beam_spread;
-    for (; angle_curr <= angle_end; angle_curr += angle_step) {
-        V2f curr_dir = v2f_rotate(player.dir, angle_curr);
-        Intersect intersect = get_intersect(player.pos, curr_dir);
+    for (u32 x = 0; x < game.window_width; x += beam_spread) {
+        f32 camera_x = 2.0f * x / (f32)game.window_width - 1.0f;
+        V2f ray = v2f_add(player.dir, v2f_scale(player.plane, camera_x));
+        Intersect intersect = get_intersect(player.pos, ray);
         platform_draw_line(player.fov_color, v2f_scale(player.pos, CELL_SIZE), v2f_scale(intersect.pos, CELL_SIZE));
     }
 #else
@@ -606,12 +686,26 @@ internal void draw_minimap_grid(f32 scale)
     }
 }
 
-internal void draw_minimap_player(f32 scale)
+internal void draw_minimap_player(f32 scale, u32 beam_spread)
 {
     f32 scaled_cell_size = CELL_SIZE * scale;
 
     V2f player_minimap_pos = v2f_add(v2f_scale(player.pos, scaled_cell_size), v2f(game.minimap_dims.x, game.minimap_dims.y));
     platform_draw_circle_filled(blue, player_minimap_pos, 2);
+    V2f minimap_top_left = v2f(game.minimap_dims.x, game.minimap_dims.y);
+
+#if 1 // Look at player fov
+    for (u32 x = 0; x < game.window_width; x += beam_spread) {
+        f32 camera_x = 2.0f * x / (f32)game.window_width - 1.0f;
+        V2f ray = v2f_add(player.dir, v2f_scale(player.plane, camera_x));
+        Intersect intersect = get_intersect(player.pos, ray);
+        platform_draw_line(player.fov_color,
+                           v2f_add(v2f_scale(player.pos, scaled_cell_size), minimap_top_left),
+                           v2f_add(v2f_scale(intersect.pos, scaled_cell_size), minimap_top_left));
+    }
+#else
+    (void)beam_spread;
+#endif
 }
 
 internal void draw_minimap()
@@ -623,7 +717,7 @@ internal void draw_minimap()
 
     draw_minimap_walls(scale);
     draw_minimap_grid(scale);
-    draw_minimap_player(scale);
+    draw_minimap_player(scale, 16);
 }
 
 internal void draw_box(Box box)
@@ -662,6 +756,13 @@ internal void draw_overlay(Overlay overlay)
     V2f dims = platform_get_text_dims(overlay.ptsize, overlay.text);
     overlay.rect = rect_new(0, 0, dims.x, dims.y);
     platform_draw_text(white, black_transparent, overlay.rect, overlay.text, overlay.ptsize);
+}
+
+Entity entity_new(V2f pos, Texture *texture) {
+    return (Entity) {
+        .pos = pos,
+        .texture = texture,
+    };
 }
 
 void game_init(void)
@@ -713,9 +814,10 @@ void game_init(void)
     game.floor_texture = LIST_GET(game.textures, 4);
     game.ceil_texture = LIST_GET(game.textures, 7);
 
-    // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"greenlight.png"));
-    // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"barrel.png"));
-    // LIST_PUSH(game.textures, load_texture_from_file(TEXTURES_PATH"pillar.png"));
+    game.entities = (Entities){0};
+    LIST_PUSH(game.entities, entity_new(v2f(5, 5), &LIST_GET(game.textures, 8)));
+    LIST_PUSH(game.entities, entity_new(v2f(6, 8), &LIST_GET(game.textures, 9)));
+    LIST_PUSH(game.entities, entity_new(v2f(12, 8), &LIST_GET(game.textures, 10)));
 
     game.menu = menu_init();
 }
@@ -731,12 +833,12 @@ internal void game_view_toggle_map(void)
 
 internal void game_view_toggle_menu(void)
 {
-    // TODO: Play sound when entering menu
     if (game.view == VIEW_GAME || game.view == VIEW_MAP) {
         game.view = VIEW_MENU;
     } else if (game.view == VIEW_MENU) {
         game.view = VIEW_GAME;
     }
+    platform_play_wav(game.menu.transition_sound);
 }
 
 internal inline void game_toggle_crosshair(void)
@@ -765,6 +867,7 @@ void game_process_mouse(void)
 
     if (game.menu.buttons.start.pressed) {
         game_view_toggle_menu();
+        platform_play_wav(game.menu.button_sound);
     }
     if (game.menu.buttons.quit.pressed) {
         game.quit = true;
@@ -847,7 +950,7 @@ void game_render(f64 dt)
     local_persist f64 elapsed_time = 0.0;
     local_persist i32 secs = 1;
     local_persist f64 frames = 0;
-    local_persist f64 frame_average = 0;
+    local_persist u32 frame_average = 0;
 
     elapsed_time += dt;
     frames += 1;
@@ -859,7 +962,7 @@ void game_render(f64 dt)
 
         case OVERLAY_STATE_SHOWN: {
             if (elapsed_time >= secs) {
-                frame_average = frames / elapsed_time;
+                frame_average = (u32)(frames / elapsed_time);
 #if 0 // Get average FPS for one second at a time
                 elapsed_time = 0.0;
                 frames = 0.0;
@@ -874,4 +977,8 @@ void game_render(f64 dt)
         } break;
     }
 }
+
+// TODO:
+//  - Draw entities on map
+//  - Player/entity collision detection
 

@@ -34,6 +34,8 @@ static_assert(WINDOW_WIDTH / COLS == WINDOW_HEIGHT / ROWS, "Should be equal");
 
 #define CROSSHAIR_LENGTH 5
 
+#define SOUND_DIR "assets/sounds/"
+
 typedef struct {
     u32 x;
     u32 y;
@@ -182,6 +184,26 @@ typedef union {
 } Keyboard_State;
 
 typedef struct {
+    V2f pos;
+    V2f rel_pos;
+    f32 square_dist_to_player;
+    Texture *texture;
+} Entity;
+
+typedef struct {
+    Entity *items;
+    u64 count;
+    u64 capacity;
+} Entities;
+
+typedef struct {
+    const char *file_path;
+    u8 *data;
+    u32 count;
+    u64 stream_index;
+} Sound;
+
+typedef struct {
     union {
         Button v[2];
         struct {
@@ -192,6 +214,8 @@ typedef struct {
             Button button_end;
         };
     } buttons;
+    Sound button_sound;
+    Sound transition_sound;
     Color bg;
 } Menu;
 
@@ -213,6 +237,7 @@ typedef struct {
     Keyboard_State keyboard_state;
 
     u32 map_index;
+    Entities entities;
 
     View view;
 
@@ -251,6 +276,8 @@ void platform_draw_text(Color fg, Color bg, Rect rect, const char *text, i32 pts
 b32  platform_point_in_rect(V2f point, Rect rect);
 void platform_get_mouse_state(Mouse_State *mouse_state);
 void platform_set_cursor(Cursor_Kind cursor);
+void platform_load_wav(Sound *sound);
+void platform_play_wav(Sound sound);
 
 #endif // GAME_H
 
